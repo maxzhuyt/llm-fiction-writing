@@ -268,6 +268,19 @@ def main():
         layout="wide"
     )
 
+    # Custom CSS for narrower sidebar (approximately 3:7 ratio)
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] {
+            min-width: 250px;
+            max-width: 300px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     st.title("Story Engine")
     st.caption("A two-stage fiction generation pipeline")
 
