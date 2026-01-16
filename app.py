@@ -8,6 +8,40 @@ from datetime import datetime
 from pathlib import Path
 
 # =============================================================================
+# Password Gate
+# =============================================================================
+
+def password_gate():
+    if "APP_PASSWORD" not in st.sec1rets:
+        return
+
+    if "authed" not in st.session_state:
+        st.session_state.authed = False
+
+    if st.session_state.authed:
+        return
+
+    st.title("🔒 Protected App")
+    pw = st.text_input("Enter password", type="password")
+
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        if st.button("Login"):
+            if pw == st.secrets["APP_PASSWORD"]:
+                st.session_state.authed = True
+                st.rerun()
+            else:
+                st.error("Wrong password")
+    with c2:
+        if st.button("Clear"):
+            st.session_state.authed = False
+            st.rerun()
+
+    st.stop()
+
+password_gate()
+
+# =============================================================================
 # Configuration
 # =============================================================================
 
