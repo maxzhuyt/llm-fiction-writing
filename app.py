@@ -46,9 +46,26 @@ password_gate()
 # =============================================================================
 
 AVAILABLE_MODELS = {
+    # Anthropic
+    "Claude Opus 4.5": "anthropic/claude-opus-4.5",
+    "Claude Opus 4": "anthropic/claude-opus-4",
+    "Claude Sonnet 4.5": "anthropic/claude-sonnet-4.5",
+    "Claude Sonnet 4": "anthropic/claude-sonnet-4",
     "Claude 3.5 Sonnet": "anthropic/claude-3.5-sonnet",
-    "Claude 4.5 Sonnet": "anthropic/claude-4.5-sonnet",
-    "Claude 3 Opus": "anthropic/claude-3-opus",
+    # OpenAI
+    "GPT-4o": "openai/gpt-4o",
+    "GPT-4o Mini": "openai/gpt-4o-mini",
+    "GPT-4 Turbo": "openai/gpt-4-turbo",
+    "o1": "openai/o1",
+    "o1 Mini": "openai/o1-mini",
+    # Google
+    "Gemini 2.0 Flash": "google/gemini-2.0-flash-001",
+    "Gemini 1.5 Pro": "google/gemini-pro-1.5",
+    "Gemini 1.5 Flash": "google/gemini-flash-1.5",
+    # Mistral
+    "Mistral Small Creative": "mistralai/mistral-small-creative",
+    "Mistral Large": "mistralai/mistral-large",
+    "Mistral Medium": "mistralai/mistral-medium",
 }
 
 DEFAULT_STEP0_SYSTEM = "You are a story structure analyst."
