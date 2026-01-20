@@ -168,7 +168,12 @@ function getEditor(id) {
  */
 function getEditorValue(id) {
     const editor = editors[id];
-    return editor ? editor.getValue() : "";
+    if (editor) {
+        return editor.getValue();
+    }
+    // Fallback: get value from textarea directly if editor not initialized
+    const textarea = document.getElementById(id);
+    return textarea ? textarea.value : "";
 }
 
 /**
