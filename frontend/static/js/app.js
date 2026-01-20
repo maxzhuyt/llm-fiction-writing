@@ -72,11 +72,10 @@ function cacheElements() {
     elements.saveSessionContainer = document.getElementById("save-session-container");
 
     elements.evalModelSelect = document.getElementById("eval-model-select");
-    elements.evalText = document.getElementById("eval-text");
-    elements.evalPrompt = document.getElementById("eval-prompt");
     elements.evalBtn = document.getElementById("eval-btn");
     elements.evalClearBtn = document.getElementById("eval-clear-btn");
     elements.evalHistory = document.getElementById("eval-history");
+    elements.evalVariables = document.getElementById("eval-variables");
 }
 
 /**
@@ -209,6 +208,10 @@ function setupEventListeners() {
             const match = textarea.id.match(/step(\d+)-user/);
             if (match) {
                 updateVariablesStatus(parseInt(match[1]));
+            }
+            // Also update eval panel variable status
+            if (textarea.id === "eval-user") {
+                updateEvalVariablesStatus();
             }
         });
     });
@@ -540,13 +543,13 @@ function handleExportFullSession() {
  * Handle evaluate button click
  */
 async function handleEvaluate() {
-    const text = elements.evalText.value;
-    const prompt = elements.evalPrompt.value;
+    const systemPrompt = window.StoryEditor.getEditorValue("eval-system");
+    const userPrompt = window.StoryEditor.getEditorValue("eval-user");
     const modelId = elements.evalModelSelect.value;
     const modelName = elements.evalModelSelect.options[elements.evalModelSelect.selectedIndex].text;
 
-    if (!text.trim()) {
-        alert("Please enter text to evaluate");
+    if (!userPrompt.trim()) {
+        alert("Please enter a user prompt");
         return;
     }
 
@@ -567,8 +570,9 @@ async function handleEvaluate() {
             body: JSON.stringify({
                 api_key: apiKeyToSend,
                 model_id: modelId,
-                text: text,
-                prompt: prompt
+                system_prompt: systemPrompt,
+                user_prompt: userPrompt,
+                outputs: state.outputs
             })
         });
 
@@ -576,8 +580,8 @@ async function handleEvaluate() {
 
         if (response.ok) {
             state.evaluationHistory.unshift({
-                text: text,
-                prompt: prompt,
+                system_prompt: systemPrompt,
+                user_prompt: userPrompt,
                 response: data.response,
                 model: modelName
             });
@@ -595,6 +599,37 @@ async function handleEvaluate() {
 }
 
 /**
+ * Update variable status for evaluation panel
+ */
+function updateEvalVariablesStatus() {
+    if (!elements.evalVariables) return;
+
+    const userPrompt = window.StoryEditor.getEditorValue("eval-user");
+    const pattern = /\bstep\d+_output\b/g;
+    const matches = userPrompt.match(pattern);
+
+    if (!matches || matches.length === 0) {
+        elements.evalVariables.innerHTML = "";
+        return;
+    }
+
+    const unique = [...new Set(matches)];
+    const valid = unique.filter(v => state.outputs[v]);
+    const pending = unique.filter(v => !state.outputs[v]);
+
+    let html = "Variables detected: ";
+    if (valid.length > 0) {
+        html += `<span class="valid">Ready: ${valid.join(", ")}</span>`;
+    }
+    if (pending.length > 0) {
+        if (valid.length > 0) html += " | ";
+        html += `<span class="pending">Pending: ${pending.join(", ")}</span>`;
+    }
+
+    elements.evalVariables.innerHTML = html;
+}
+
+/**
  * Render evaluation history
  */
 function renderEvaluationHistory() {
@@ -609,13 +644,15 @@ function renderEvaluationHistory() {
 
     state.evaluationHistory.forEach((item, index) => {
         const num = state.evaluationHistory.length - index;
-        const textPreview = item.text.length > 150 ? item.text.substring(0, 150) + "..." : item.text;
+        const userPreview = item.user_prompt && item.user_prompt.length > 150
+            ? item.user_prompt.substring(0, 150) + "..."
+            : (item.user_prompt || item.text || "");
 
         html += `
             <div class="eval-item">
                 <div class="eval-item-header">#${num} (${item.model})</div>
-                <div class="eval-item-text"><strong>Text:</strong> ${escapeHtml(textPreview)}</div>
-                <div class="eval-item-question"><strong>Question:</strong> ${escapeHtml(item.prompt)}</div>
+                <div class="eval-item-text"><strong>System:</strong> ${escapeHtml(item.system_prompt || "N/A")}</div>
+                <div class="eval-item-question"><strong>User:</strong> ${escapeHtml(userPreview)}</div>
                 <div class="eval-item-response">${escapeHtml(item.response)}</div>
             </div>
         `;

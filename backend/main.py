@@ -53,8 +53,9 @@ class GenerateRequest(BaseModel):
 class EvaluateRequest(BaseModel):
     api_key: str
     model_id: str
-    text: str
-    prompt: str
+    system_prompt: str
+    user_prompt: str
+    outputs: Dict[str, str] = {}
 
 
 class ExportRequest(BaseModel):
@@ -161,14 +162,15 @@ async def evaluate(req: EvaluateRequest):
     if not api_key:
         raise HTTPException(status_code=400, detail="API key is required")
 
-    combined_prompt = f"Text to evaluate:\n\n{req.text}\n\nQuestion/Task: {req.prompt}"
+    # Expand variables in the user prompt
+    expanded_user_prompt = expand_variables(req.user_prompt, req.outputs)
 
     client = get_client(api_key)
     result = await call_llm(
         client,
         req.model_id,
-        "You are a helpful assistant that evaluates and analyzes text.",
-        combined_prompt
+        req.system_prompt,
+        expanded_user_prompt
     )
 
     return {"response": result}

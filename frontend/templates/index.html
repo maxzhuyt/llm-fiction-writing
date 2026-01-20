@@ -187,22 +187,51 @@
                             </select>
                         </div>
 
-                        <!-- Text to evaluate -->
+                        <!-- System Prompt -->
                         <div class="prompt-section">
-                            <label>Paste text to evaluate</label>
-                            <textarea id="eval-text" placeholder="Paste any text here that you want the LLM to evaluate..."></textarea>
+                            <label>System Prompt</label>
+                            <div class="editor-container">
+                                <div class="editor-wrapper">
+                                    <textarea id="eval-system" class="code-editor">You are a helpful assistant that evaluates and analyzes text.</textarea>
+                                </div>
+                                <div class="editor-buttons">
+                                    <button class="btn btn-small edit-toggle-btn" data-editor="eval-system" data-editing="true">Done</button>
+                                    <button class="btn btn-small editor-copy-btn" data-editor="eval-system" title="Copy to clipboard">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Evaluation prompt -->
+                        <!-- User Prompt (supports variables) -->
                         <div class="prompt-section">
-                            <label>What would you like to know?</label>
-                            <input type="text" id="eval-prompt" value="Analyze this text and provide feedback.">
+                            <label>User Prompt <span class="hint">(use step0_output, step1_output, step2_output to insert generated content)</span></label>
+                            <div class="editor-container">
+                                <div class="editor-wrapper">
+                                    <textarea id="eval-user" class="code-editor">Please analyze the following text and provide feedback:
+
+step2_output</textarea>
+                                </div>
+                                <div class="editor-buttons">
+                                    <button class="btn btn-small edit-toggle-btn" data-editor="eval-user" data-editing="true">Done</button>
+                                    <button class="btn btn-small editor-copy-btn" data-editor="eval-user" title="Copy to clipboard">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="eval-variables" class="variables-status"></div>
                         </div>
 
                         <!-- Buttons -->
                         <div class="button-row">
                             <button id="eval-btn" class="btn btn-primary">Evaluate</button>
-                            <button id="eval-clear-btn" class="btn btn-secondary">Clear Conversation</button>
+                            <button id="eval-clear-btn" class="btn btn-secondary">Clear History</button>
                         </div>
 
                         <!-- Evaluation History -->
