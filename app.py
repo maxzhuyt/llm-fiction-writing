@@ -225,7 +225,7 @@ def render_sidebar():
         
         # If secret API key exists, show status and option to override
         if secret_api_key:
-            st.success("✓ API Key configured (from secrets)")
+            st.success("✓ API Key configured")
             use_manual = st.checkbox("Override with manual input", key="override_api_key")
             
             if use_manual:
