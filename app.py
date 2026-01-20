@@ -6,7 +6,6 @@ import streamlit as st
 from openai import OpenAI
 from datetime import datetime
 from pathlib import Path
-import json
 
 # =============================================================================
 # Password Gate
@@ -137,43 +136,6 @@ def init_edit_state(key: str, default_value: str):
         st.session_state[f"{key}_editing"] = True
 
 
-def render_copy_button(text: str, button_key: str, button_label: str = "📋 Copy"):
-    """Render a one-click copy button using JavaScript."""
-    # Use JSON to safely escape the text for JavaScript
-    escaped_text = json.dumps(text)
-    
-    copy_html = f"""
-    <button 
-        onclick="navigator.clipboard.writeText({escaped_text}).then(() => {{
-            const btn = document.querySelector('[data-copy-btn-key=\"{button_key}\"]');
-            const originalText = btn.textContent;
-            btn.textContent = '✓ Copied!';
-            btn.style.backgroundColor = '#28a745';
-            setTimeout(() => {{
-                btn.textContent = originalText;
-                btn.style.backgroundColor = '';
-            }}, 2000);
-        }}).catch(err => alert('Failed to copy: ' + err));"
-        data-copy-btn-key="{button_key}"
-        style="
-            background-color: #0d6efd;
-            color: white;
-            border: none;
-            padding: 0.375rem 0.75rem;
-            border-radius: 0.25rem;
-            cursor: pointer;
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-        "
-        onmouseover="this.style.backgroundColor='#0b5ed7'"
-        onmouseout="this.style.backgroundColor='#0d6efd'"
-    >
-        {button_label}
-    </button>
-    """
-    st.markdown(copy_html, unsafe_allow_html=True)
-
-
 def render_editable_field(label: str, key: str, height: int = 100):
     """Render a text field with Edit/Done buttons."""
     editing = st.session_state.get(f"{key}_editing", False)
@@ -202,10 +164,6 @@ def render_editable_field(label: str, key: str, height: int = 100):
 
     if editing:
         st.session_state[f"{key}_value"] = value
-
-    # Add copy button for input field
-    if value:
-        render_copy_button(value, f"{key}_copy_btn", "📋 Copy")
 
     return st.session_state.get(f"{key}_value", "")
 
@@ -368,8 +326,11 @@ def render_step(step_num: int, step_title: str, system_key: str, user_key: str,
         if step_num == 2:
             # Step 2 (story) uses markdown for natural line breaks
             st.markdown(st.session_state[output_key])
-        # All steps have one-click copy button
-        render_copy_button(st.session_state[output_key], f"{output_key}_copy_btn", "📋 Copy output")
+            with st.expander("Copy text"):
+                st.code(st.session_state[output_key], language=None)
+        else:
+            # Steps 0-1 use code block with built-in copy button
+            st.code(st.session_state[output_key], language=None)
 
     return st.session_state.get(output_key, "")
 
