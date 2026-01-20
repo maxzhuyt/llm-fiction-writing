@@ -1,2 +1,11 @@
-streamlit>=1.28.0
+# FastAPI Backend
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+jinja2>=3.1.2
+python-dotenv>=1.0.0
 openai>=1.0.0
+aiofiles>=23.2.1
+
+# Legacy Streamlit (can be removed after migration is complete)
+# streamlit>=1.28.0
+# st-copy-to-clipboard>=0.1.0

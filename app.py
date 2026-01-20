@@ -2,10 +2,12 @@
 Story Engine - A fiction generation pipeline using Streamlit and OpenRouter.
 """
 
+import re
 import streamlit as st
 from openai import OpenAI
 from datetime import datetime
 from pathlib import Path
+from st_copy_to_clipboard import st_copy_to_clipboard
 
 # =============================================================================
 # Password Gate
@@ -125,6 +127,41 @@ def call_llm(client: OpenAI, model: str, system_prompt: str, user_message: str,
 
 
 # =============================================================================
+# Variable Interpolation
+# =============================================================================
+
+def expand_variables(text: str) -> str:
+    """Replace stepN_output placeholders with actual values."""
+    pattern = r'\b(step\d+_output)\b'
+    def replace_match(match):
+        var_name = match.group(1)
+        value = st.session_state.get(var_name, "")
+        return value if value else f"[{var_name} not yet generated]"
+    return re.sub(pattern, replace_match, text)
+
+
+def get_detected_variables(text: str) -> list:
+    """Return list of variable names found in the text."""
+    pattern = r'\b(step\d+_output)\b'
+    return list(set(re.findall(pattern, text)))
+
+
+def has_variables(text: str) -> bool:
+    """Check if text contains any variable placeholders."""
+    pattern = r'\bstep\d+_output\b'
+    return bool(re.search(pattern, text))
+
+
+def get_available_variable_names(current_step: int) -> list:
+    """Get list of available variable names based on generated outputs."""
+    variables = []
+    for i in range(current_step):
+        if st.session_state.get(f"step{i}_output"):
+            variables.append(f"step{i}_output")
+    return variables
+
+
+# =============================================================================
 # UI Components
 # =============================================================================
 
@@ -136,40 +173,99 @@ def init_edit_state(key: str, default_value: str):
         st.session_state[f"{key}_editing"] = True
 
 
-def render_editable_field(label: str, key: str, height: int = 100):
-    """Render a text field with Edit/Done buttons."""
+def render_editable_field(label: str, key: str, height: int = 100,
+                          step_num: int = None, allow_variables: bool = False):
+    """Render a text field with Edit/Done buttons and copy button."""
     editing = st.session_state.get(f"{key}_editing", False)
+    current_value = st.session_state.get(f"{key}_value", "")
 
-    col1, col2 = st.columns([6, 1])
-    with col1:
-        st.markdown(f"**{label}**")
-    with col2:
+    # Label
+    st.markdown(f"**{label}**")
+
+    # Main layout: text area on left, buttons on right
+    text_col, btn_col = st.columns([6, 1])
+
+    with text_col:
         if editing:
-            if st.button("Done", key=f"{key}_done_btn", type="primary"):
+            # Use standard text area
+            value = st.text_area(
+                label,
+                value=current_value,
+                height=height,
+                key=f"{key}_input",
+                label_visibility="collapsed"
+            )
+            if value != current_value:
+                st.session_state[f"{key}_value"] = value
+                current_value = value
+        else:
+            # Display as styled text when not editing
+            display_text = current_value if current_value else "(empty)"
+            # Highlight variables in display mode
+            if current_value and has_variables(current_value):
+                highlighted = re.sub(
+                    r'\b(step\d+_output)\b',
+                    r'<span style="color: #16a34a; font-family: monospace; font-weight: bold; background: #dcfce7; padding: 2px 4px; border-radius: 3px;">\1</span>',
+                    current_value
+                )
+                st.markdown(
+                    f'<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; '
+                    f'min-height: {height}px; white-space: pre-wrap; border: 1px solid #ddd;">{highlighted}</div>',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f'<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; '
+                    f'min-height: {height}px; white-space: pre-wrap; border: 1px solid #ddd;">{display_text}</div>',
+                    unsafe_allow_html=True
+                )
+
+    with btn_col:
+        # Edit/Done button
+        if editing:
+            if st.button("Done", key=f"{key}_done_btn", type="primary", use_container_width=True):
                 st.session_state[f"{key}_editing"] = False
                 st.rerun()
         else:
-            if st.button("Edit", key=f"{key}_edit_btn"):
+            if st.button("Edit", key=f"{key}_edit_btn", use_container_width=True):
                 st.session_state[f"{key}_editing"] = True
                 st.rerun()
 
-    value = st.text_area(
-        label,
-        value=st.session_state.get(f"{key}_value", ""),
-        height=height,
-        key=f"{key}_input",
-        disabled=not editing,
-        label_visibility="collapsed"
-    )
+        # Copy button - copies to clipboard
+        if current_value:
+            st_copy_to_clipboard(current_value, key=f"{key}_copy")
 
-    if editing:
-        st.session_state[f"{key}_value"] = value
+    # Show detected variables below (for both editing and viewing)
+    current_value = st.session_state.get(f"{key}_value", "")
+    if has_variables(current_value):
+        detected_vars = get_detected_variables(current_value)
+        valid_vars = [v for v in detected_vars if st.session_state.get(v)]
+        invalid_vars = [v for v in detected_vars if not st.session_state.get(v)]
 
-    return st.session_state.get(f"{key}_value", "")
+        if valid_vars or invalid_vars:
+            msg_parts = []
+            if valid_vars:
+                msg_parts.append(f"<span style='color: #16a34a;'>Ready: {', '.join(valid_vars)}</span>")
+            if invalid_vars:
+                msg_parts.append(f"<span style='color: #d97706;'>Pending: {', '.join(invalid_vars)}</span>")
+            st.markdown(
+                f"<div style='font-size: 12px; padding: 4px 8px; background: #f0f9ff; border-radius: 4px; margin-top: 4px;'>"
+                f"Variables detected: {' | '.join(msg_parts)}</div>",
+                unsafe_allow_html=True
+            )
+
+    return current_value
 
 
 def export_prompt(step_num: int, system: str, user: str, step_title: str, include_previous: bool):
-    """Generate export content for a step's prompts, optionally including previous steps."""
+    """Generate export content for a step's prompts, optionally including previous steps.
+
+    Note: Variables like step0_output are expanded to their actual values in the export.
+    """
+    # Expand variables in system and user prompts
+    expanded_system = expand_variables(system)
+    expanded_user = expand_variables(user)
+
     lines = [f"Step {step_num}: {step_title} - Exported Prompts"]
     lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append("")
@@ -182,8 +278,8 @@ def export_prompt(step_num: int, system: str, user: str, step_title: str, includ
         lines.append("")
 
         for i in range(step_num):
-            step_system = st.session_state.get(f"step{i}_system_value", "")
-            step_user = st.session_state.get(f"step{i}_user_value", "")
+            step_system = expand_variables(st.session_state.get(f"step{i}_system_value", ""))
+            step_user = expand_variables(st.session_state.get(f"step{i}_user_value", ""))
             step_output = st.session_state.get(f"step{i}_output", "")
 
             lines.append(f"--- Step {i} ---")
@@ -200,10 +296,10 @@ def export_prompt(step_num: int, system: str, user: str, step_title: str, includ
         lines.append("")
 
     lines.append(f"System Prompt:")
-    lines.append(system)
+    lines.append(expanded_system)
     lines.append("")
     lines.append(f"User Prompt:")
-    lines.append(user)
+    lines.append(expanded_user)
     lines.append("")
 
     return "\n".join(lines)
@@ -216,26 +312,38 @@ def render_sidebar():
 
         # API Key
         st.subheader("API Key")
-        secret_api_key = st.secrets.get("OPENROUTER_API_KEY", "") if "OPENROUTER_API_KEY" in st.secrets else ""
-        
-        # If secret API key exists, show status and option to override
-        if secret_api_key:
-            st.success("✓ API Key configured")
-            use_manual = st.checkbox("Override with manual input", key="override_api_key")
-            
-            if use_manual:
-                manual_api_key = st.text_input(
+
+        # Try to get API key from secrets
+        secret_api_key = ""
+        secret_error = False
+        try:
+            if hasattr(st, 'secrets') and "OPENROUTER_API_KEY" in st.secrets:
+                secret_api_key = st.secrets["OPENROUTER_API_KEY"]
+        except Exception:
+            secret_error = True
+
+        # If secret API key exists, show prefilled with option to override
+        if secret_api_key and not secret_error:
+            st.success("API Key configured from environment")
+            use_override = st.checkbox("Override API key", key="override_api_key")
+
+            if use_override:
+                api_key = st.text_input(
                     "OpenRouter API Key",
                     value="",
                     type="password",
-                    placeholder="Enter your OpenRouter API key",
+                    placeholder="Enter a different API key",
                     key="manual_api_key_input"
                 )
-                api_key = manual_api_key if manual_api_key else secret_api_key
+                # Fall back to secret if override is empty
+                if not api_key:
+                    api_key = secret_api_key
             else:
                 api_key = secret_api_key
         else:
-            # No secret API key, show normal input
+            # No secret API key or error reading secrets - show empty text input
+            if secret_error:
+                st.warning("Could not read API key from secrets")
             api_key = st.text_input(
                 "OpenRouter API Key",
                 value="",
@@ -279,11 +387,14 @@ def render_step(step_num: int, step_title: str, system_key: str, user_key: str,
     init_edit_state(system_key, default_system)
     init_edit_state(user_key, default_user)
 
-    # System prompt
+    # System prompt (no variable support)
     system_prompt = render_editable_field("System Prompt", system_key, height=100)
 
-    # User prompt
-    user_prompt = render_editable_field("User Prompt", user_key, height=150)
+    # User prompt (with variable support for steps 1 and 2)
+    user_prompt = render_editable_field(
+        "User Prompt", user_key, height=150,
+        step_num=step_num, allow_variables=(step_num > 0)
+    )
 
     # Include previous steps checkbox (for steps 1 and 2)
     include_previous = False
@@ -316,23 +427,109 @@ def render_step(step_num: int, step_title: str, system_key: str, user_key: str,
             client = get_client(api_key)
             # Get previous context if checkbox is enabled
             previous_context = get_step_context(step_num) if include_previous else None
-            result = call_llm(client, model_id, system_prompt, user_prompt, previous_context)
+            # Expand variables in the user prompt before sending to LLM
+            expanded_user_prompt = expand_variables(user_prompt)
+            result = call_llm(client, model_id, system_prompt, expanded_user_prompt, previous_context)
             st.session_state[output_key] = result
             st.rerun()
 
     # Display output
     if st.session_state.get(output_key):
+        output_text = st.session_state[output_key]
         st.markdown("**Output:**")
+
         if step_num == 2:
             # Step 2 (story) uses markdown for natural line breaks
-            st.markdown(st.session_state[output_key])
+            st.markdown(output_text)
+            # Provide copy option via expander
             with st.expander("Copy text"):
-                st.code(st.session_state[output_key], language=None)
+                st.code(output_text, language=None)
         else:
             # Steps 0-1 use code block with built-in copy button
-            st.code(st.session_state[output_key], language=None)
+            st.code(output_text, language=None)
 
     return st.session_state.get(output_key, "")
+
+
+def render_evaluation_panel(api_key: str, default_model_id: str):
+    """Render the LLM evaluation panel at the bottom of the page."""
+    # Initialize evaluation history
+    if "evaluation_history" not in st.session_state:
+        st.session_state.evaluation_history = []
+
+    with st.expander("Evaluate Text with LLM", expanded=False):
+        # Model selection for evaluation
+        eval_model_name = st.selectbox(
+            "Model for evaluation",
+            options=list(AVAILABLE_MODELS.keys()),
+            key="eval_model_select"
+        )
+        eval_model_id = AVAILABLE_MODELS[eval_model_name]
+
+        text_to_evaluate = st.text_area(
+            "Paste text to evaluate",
+            height=100,
+            key="eval_text_input",
+            placeholder="Paste any text here that you want the LLM to evaluate..."
+        )
+
+        evaluation_prompt = st.text_input(
+            "What would you like to know?",
+            value="Analyze this text and provide feedback.",
+            key="eval_prompt_input"
+        )
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            evaluate_btn = st.button(
+                "Evaluate",
+                disabled=not text_to_evaluate or not api_key,
+                key="eval_submit_btn",
+                type="primary"
+            )
+        with col2:
+            if st.button("Clear Conversation", key="eval_clear_btn"):
+                st.session_state.evaluation_history = []
+                st.rerun()
+
+        # Handle evaluation
+        if evaluate_btn and text_to_evaluate:
+            with st.spinner("Evaluating..."):
+                client = get_client(api_key)
+                # Combine text and prompt for LLM
+                combined_prompt = f"Text to evaluate:\n\n{text_to_evaluate}\n\nQuestion/Task: {evaluation_prompt}"
+                result = call_llm(
+                    client,
+                    eval_model_id,
+                    "You are a helpful assistant that evaluates and analyzes text.",
+                    combined_prompt
+                )
+                # Add to history with model info
+                st.session_state.evaluation_history.append({
+                    'text': text_to_evaluate,
+                    'prompt': evaluation_prompt,
+                    'response': result,
+                    'model': eval_model_name
+                })
+                st.rerun()
+
+        # Display conversation history (most recent first)
+        if st.session_state.evaluation_history:
+            st.markdown("---")
+            st.markdown("**Evaluation History:**")
+            for i, item in enumerate(reversed(st.session_state.evaluation_history)):
+                idx = len(st.session_state.evaluation_history) - i
+                with st.container():
+                    # Show truncated text and model used
+                    text_preview = item['text'][:150] + "..." if len(item['text']) > 150 else item['text']
+                    model_used = item.get('model', 'Unknown')
+                    st.info(f"**#{idx}** ({model_used}) - **Text:** {text_preview}")
+                    st.markdown(f"**Question:** {item['prompt']}")
+
+                    # Response with copy via code block
+                    st.markdown(f"**Response:**")
+                    st.code(item['response'], language=None)
+                    st.divider()
 
 
 def render_main_interface(api_key: str, model_id: str):
@@ -345,6 +542,19 @@ def render_main_interface(api_key: str, model_id: str):
         st.session_state.step1_output = ""
     if "step2_output" not in st.session_state:
         st.session_state.step2_output = ""
+
+    # Instructions for variable interpolation
+    with st.expander("How to use variables", expanded=False):
+        st.markdown("""
+**Reference previous outputs in your prompts:**
+
+Type `step0_output`, `step1_output`, etc. directly in any User Prompt field to reference the output from that step.
+
+For example, in Step 1's User Prompt, you could write:
+> Analyze the following template and create a detailed outline: step0_output
+
+The system will automatically replace `step0_output` with the actual generated content when sending to the LLM.
+        """)
 
     # Step 0: Template
     render_step(
@@ -398,6 +608,10 @@ def render_main_interface(api_key: str, model_id: str):
         if st.button("Save Full Session"):
             filepath = save_session()
             st.success(f"Session saved to: {filepath}")
+
+    # Evaluation panel at the bottom
+    st.divider()
+    render_evaluation_panel(api_key, model_id)
 
 
 def save_session() -> str:
@@ -466,7 +680,7 @@ def main():
         layout="wide"
     )
 
-    # Custom CSS for narrower sidebar
+    # Custom CSS and JavaScript for autocomplete
     st.markdown(
         """
         <style>
@@ -474,7 +688,206 @@ def main():
             min-width: 250px;
             max-width: 300px;
         }
+
+        /* Autocomplete popup styles */
+        #step-autocomplete {
+            position: fixed;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: none;
+            max-width: 200px;
+        }
+        #step-autocomplete .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 14px;
+            color: #16a34a;
+            background: #f8fff8;
+        }
+        #step-autocomplete .autocomplete-item:hover,
+        #step-autocomplete .autocomplete-item.selected {
+            background: #dcfce7;
+        }
+        #step-autocomplete .autocomplete-header {
+            padding: 6px 12px;
+            font-size: 11px;
+            color: #666;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+        }
         </style>
+
+        <div id="step-autocomplete">
+            <div class="autocomplete-header">Insert variable</div>
+        </div>
+
+        <script>
+        (function() {
+            // Prevent duplicate initialization
+            if (window.stepAutocompleteInitialized) return;
+            window.stepAutocompleteInitialized = true;
+
+            const popup = document.getElementById('step-autocomplete');
+            let activeTextarea = null;
+            let selectedIndex = 0;
+            let currentMatches = [];
+
+            // All possible variables
+            const allVariables = ['step0_output', 'step1_output', 'step2_output'];
+
+            function getCaretCoordinates(element) {
+                // Get approximate position for popup
+                const rect = element.getBoundingClientRect();
+                const style = getComputedStyle(element);
+                const lineHeight = parseInt(style.lineHeight) || 20;
+                const paddingTop = parseInt(style.paddingTop) || 0;
+                const paddingLeft = parseInt(style.paddingLeft) || 0;
+
+                // Simple approximation: place near top-left of textarea
+                return {
+                    top: rect.top + paddingTop + lineHeight,
+                    left: rect.left + paddingLeft + 50
+                };
+            }
+
+            function getCurrentWord(textarea) {
+                const pos = textarea.selectionStart;
+                const text = textarea.value;
+
+                // Find word start
+                let start = pos;
+                while (start > 0 && /\w/.test(text[start - 1])) {
+                    start--;
+                }
+
+                return {
+                    word: text.substring(start, pos),
+                    start: start,
+                    end: pos
+                };
+            }
+
+            function showPopup(textarea, matches) {
+                if (matches.length === 0) {
+                    hidePopup();
+                    return;
+                }
+
+                currentMatches = matches;
+                selectedIndex = 0;
+                activeTextarea = textarea;
+
+                // Build popup content
+                let html = '<div class="autocomplete-header">Insert variable</div>';
+                matches.forEach((m, i) => {
+                    const cls = i === 0 ? 'autocomplete-item selected' : 'autocomplete-item';
+                    html += '<div class="' + cls + '" data-value="' + m + '">' + m + '</div>';
+                });
+                popup.innerHTML = html;
+
+                // Position popup
+                const coords = getCaretCoordinates(textarea);
+                popup.style.top = coords.top + 'px';
+                popup.style.left = coords.left + 'px';
+                popup.style.display = 'block';
+
+                // Add click handlers
+                popup.querySelectorAll('.autocomplete-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        insertVariable(this.dataset.value);
+                    });
+                });
+            }
+
+            function hidePopup() {
+                popup.style.display = 'none';
+                activeTextarea = null;
+                currentMatches = [];
+            }
+
+            function updateSelection() {
+                const items = popup.querySelectorAll('.autocomplete-item');
+                items.forEach((item, i) => {
+                    item.classList.toggle('selected', i === selectedIndex);
+                });
+            }
+
+            function insertVariable(varName) {
+                if (!activeTextarea) return;
+
+                const wordInfo = getCurrentWord(activeTextarea);
+                const before = activeTextarea.value.substring(0, wordInfo.start);
+                const after = activeTextarea.value.substring(wordInfo.end);
+
+                activeTextarea.value = before + varName + after;
+
+                // Set cursor position after inserted text
+                const newPos = wordInfo.start + varName.length;
+                activeTextarea.setSelectionRange(newPos, newPos);
+
+                // Trigger input event for Streamlit to pick up the change
+                activeTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+                hidePopup();
+                activeTextarea.focus();
+            }
+
+            // Monitor for textarea input
+            document.addEventListener('input', function(e) {
+                if (e.target.tagName !== 'TEXTAREA') return;
+
+                const wordInfo = getCurrentWord(e.target);
+                const word = wordInfo.word.toLowerCase();
+
+                // Check if typing something that starts with "step"
+                if (word.startsWith('step') && word.length >= 4) {
+                    // Filter variables that match
+                    const matches = allVariables.filter(v =>
+                        v.toLowerCase().startsWith(word) && v.toLowerCase() !== word
+                    );
+                    showPopup(e.target, matches);
+                } else {
+                    hidePopup();
+                }
+            }, true);
+
+            // Handle keyboard navigation
+            document.addEventListener('keydown', function(e) {
+                if (popup.style.display !== 'block') return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, currentMatches.length - 1);
+                    updateSelection();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, 0);
+                    updateSelection();
+                } else if (e.key === 'Enter' || e.key === 'Tab') {
+                    if (currentMatches.length > 0) {
+                        e.preventDefault();
+                        insertVariable(currentMatches[selectedIndex]);
+                    }
+                } else if (e.key === 'Escape') {
+                    hidePopup();
+                }
+            }, true);
+
+            // Hide popup when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!popup.contains(e.target) && e.target !== activeTextarea) {
+                    hidePopup();
+                }
+            });
+
+            // Hide popup on scroll
+            document.addEventListener('scroll', hidePopup, true);
+        })();
+        </script>
         """,
         unsafe_allow_html=True
     )
