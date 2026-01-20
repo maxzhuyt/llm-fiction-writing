@@ -559,17 +559,17 @@ function handleExportFullSession() {
  * Handle evaluate button click
  */
 async function handleEvaluate() {
-    console.log("handleEvaluate called");
-
     const systemPrompt = window.StoryEditor.getEditorValue("eval-system");
     const userPrompt = window.StoryEditor.getEditorValue("eval-user");
 
-    console.log("systemPrompt:", systemPrompt);
-    console.log("userPrompt:", userPrompt);
-    console.log("state.apiKey:", state.apiKey);
-
-    const modelId = elements.evalModelSelect.value;
-    const modelName = elements.evalModelSelect.options[elements.evalModelSelect.selectedIndex].text;
+    // Get model select element (may not be cached if inside collapsed details)
+    const modelSelect = document.getElementById("eval-model-select");
+    if (!modelSelect) {
+        alert("Error: Could not find model selector");
+        return;
+    }
+    const modelId = modelSelect.value;
+    const modelName = modelSelect.options[modelSelect.selectedIndex].text;
 
     if (!userPrompt.trim()) {
         alert("Please enter a user prompt");
