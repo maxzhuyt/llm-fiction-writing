@@ -215,6 +215,22 @@ function setupEventListeners() {
             }
         });
     });
+
+    // Refresh eval panel editors when details is opened (CodeMirror needs this)
+    const evalDetails = document.querySelector(".evaluation-panel details");
+    if (evalDetails) {
+        evalDetails.addEventListener("toggle", () => {
+            if (evalDetails.open) {
+                // Refresh CodeMirror editors inside the panel
+                const evalSystem = window.StoryEditor.getEditor("eval-system");
+                const evalUser = window.StoryEditor.getEditor("eval-user");
+                if (evalSystem) evalSystem.refresh();
+                if (evalUser) evalUser.refresh();
+                // Update variable status
+                updateEvalVariablesStatus();
+            }
+        });
+    }
 }
 
 /**
