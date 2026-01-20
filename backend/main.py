@@ -104,7 +104,6 @@ async def get_config():
         "models": AVAILABLE_MODELS,
         "steps": STEPS,
         "has_env_api_key": bool(OPENROUTER_API_KEY),
-        "env_api_key": OPENROUTER_API_KEY if OPENROUTER_API_KEY else None,
         "has_password": bool(APP_PASSWORD),
     }
 
@@ -120,7 +119,9 @@ async def check_password(req: PasswordCheckRequest):
 @app.post("/api/generate")
 async def generate(req: GenerateRequest):
     """Generate LLM output for a step."""
-    if not req.api_key:
+    # Use provided API key or fall back to environment variable
+    api_key = req.api_key or OPENROUTER_API_KEY
+    if not api_key:
         raise HTTPException(status_code=400, detail="API key is required")
 
     # Expand variables in the user prompt
@@ -140,7 +141,7 @@ async def generate(req: GenerateRequest):
                 })
 
     # Call LLM
-    client = get_client(req.api_key)
+    client = get_client(api_key)
     result = await call_llm(
         client,
         req.model_id,
@@ -155,12 +156,14 @@ async def generate(req: GenerateRequest):
 @app.post("/api/evaluate")
 async def evaluate(req: EvaluateRequest):
     """Evaluate text with LLM."""
-    if not req.api_key:
+    # Use provided API key or fall back to environment variable
+    api_key = req.api_key or OPENROUTER_API_KEY
+    if not api_key:
         raise HTTPException(status_code=400, detail="API key is required")
 
     combined_prompt = f"Text to evaluate:\n\n{req.text}\n\nQuestion/Task: {req.prompt}"
 
-    client = get_client(req.api_key)
+    client = get_client(api_key)
     result = await call_llm(
         client,
         req.model_id,

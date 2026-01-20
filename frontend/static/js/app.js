@@ -105,17 +105,11 @@ function hidePasswordModal() {
  * Set up API key handling
  */
 function setupApiKey() {
-    // If environment API key exists
+    // If environment API key exists on server, mark it as available
+    // The actual key stays server-side for security
     if (window.APP_CONFIG.hasEnvApiKey) {
-        // Fetch the actual API key from config endpoint
-        fetch("/api/config")
-            .then(res => res.json())
-            .then(data => {
-                if (data.env_api_key) {
-                    state.apiKey = data.env_api_key;
-                    updateApiKeyWarning();
-                }
-            });
+        state.apiKey = "__ENV_KEY__";  // Marker that server has the key
+        updateApiKeyWarning();
     }
 
     // Set initial model
@@ -144,16 +138,10 @@ function setupEventListeners() {
             if (elements.apiKeyOverride) {
                 elements.apiKeyOverride.style.display = e.target.checked ? "block" : "none";
             }
-            if (!e.target.checked) {
-                // Reset to env API key
-                fetch("/api/config")
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.env_api_key) {
-                            state.apiKey = data.env_api_key;
-                            updateApiKeyWarning();
-                        }
-                    });
+            if (!e.target.checked && window.APP_CONFIG.hasEnvApiKey) {
+                // Reset to server's env API key
+                state.apiKey = "__ENV_KEY__";
+                updateApiKeyWarning();
             }
         });
     }
@@ -291,12 +279,15 @@ async function handleGenerate(stepNum) {
 
     showLoading("Generating...");
 
+    // If using server's env key, send empty string (server will use its env var)
+    const apiKeyToSend = state.apiKey === "__ENV_KEY__" ? "" : state.apiKey;
+
     try {
         const response = await fetch("/api/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                api_key: state.apiKey,
+                api_key: apiKeyToSend,
                 model_id: state.modelId,
                 system_prompt: systemPrompt,
                 user_prompt: userPrompt,
@@ -612,12 +603,15 @@ async function handleEvaluate() {
 
     showLoading("Evaluating...");
 
+    // If using server's env key, send empty string (server will use its env var)
+    const apiKeyToSend = state.apiKey === "__ENV_KEY__" ? "" : state.apiKey;
+
     try {
         const response = await fetch("/api/evaluate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                api_key: state.apiKey,
+                api_key: apiKeyToSend,
                 model_id: modelId,
                 text: text,
                 prompt: prompt
