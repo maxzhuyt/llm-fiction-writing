@@ -165,6 +165,11 @@ def render_editable_field(label: str, key: str, height: int = 100):
     if editing:
         st.session_state[f"{key}_value"] = value
 
+    # Add copy button for input field
+    if value:
+        with st.expander("📋 Copy", expanded=False):
+            st.code(value, language=None)
+
     return st.session_state.get(f"{key}_value", "")
 
 
@@ -216,9 +221,10 @@ def render_sidebar():
 
         # API Key
         st.subheader("API Key")
+        default_api_key = st.secrets.get("OPENROUTER_API_KEY", "") if "OPENROUTER_API_KEY" in st.secrets else ""
         api_key = st.text_input(
             "OpenRouter API Key",
-            value="",
+            value=default_api_key,
             type="password",
             placeholder="Enter your OpenRouter API key"
         )
@@ -306,10 +312,8 @@ def render_step(step_num: int, step_title: str, system_key: str, user_key: str,
         if step_num == 2:
             # Step 2 (story) uses markdown for natural line breaks
             st.markdown(st.session_state[output_key])
-            with st.expander("Copy text"):
-                st.code(st.session_state[output_key], language=None)
-        else:
-            # Steps 0-1 use code block with built-in copy button
+        # All steps have copy button in expander
+        with st.expander("📋 Copy output", expanded=False):
             st.code(st.session_state[output_key], language=None)
 
     return st.session_state.get(output_key, "")
