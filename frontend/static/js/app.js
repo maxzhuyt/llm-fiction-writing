@@ -68,10 +68,8 @@ function cacheElements() {
     elements.loadingOverlay = document.getElementById("loading-overlay");
     elements.loadingText = document.getElementById("loading-text");
 
-    elements.saveSessionBtn = document.getElementById("save-session-btn");
     elements.exportFullSessionBtn = document.getElementById("export-full-session-btn");
     elements.saveSessionContainer = document.getElementById("save-session-container");
-    elements.saveStatus = document.getElementById("save-status");
 
     elements.evalModelSelect = document.getElementById("eval-model-select");
     elements.evalText = document.getElementById("eval-text");
@@ -187,11 +185,6 @@ function setupEventListeners() {
     document.querySelectorAll(".editor-copy-btn").forEach(btn => {
         btn.addEventListener("click", () => handleEditorCopy(btn));
     });
-
-    // Save session
-    if (elements.saveSessionBtn) {
-        elements.saveSessionBtn.addEventListener("click", handleSaveSession);
-    }
 
     // Export full session
     if (elements.exportFullSessionBtn) {
@@ -498,45 +491,6 @@ function handleEditorCopy(btn) {
         btn.classList.add("copied");
         setTimeout(() => btn.classList.remove("copied"), 1500);
     });
-}
-
-/**
- * Handle save session button click
- */
-async function handleSaveSession() {
-    const steps = [];
-    for (let i = 0; i <= 2; i++) {
-        const step = window.APP_CONFIG.steps[i];
-        steps.push({
-            num: i,
-            title: step.title,
-            system: window.StoryEditor.getEditorValue(`step${i}-system`),
-            user: window.StoryEditor.getEditorValue(`step${i}-user`),
-            output: state.outputs[`step${i}_output`] || ""
-        });
-    }
-
-    try {
-        const response = await fetch("/api/save-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ steps })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            elements.saveStatus.textContent = `Saved to: ${data.filename}`;
-            setTimeout(() => {
-                elements.saveStatus.textContent = "";
-            }, 5000);
-        } else {
-            alert(`Error saving: ${data.detail || "Save failed"}`);
-        }
-    } catch (error) {
-        console.error("Save error:", error);
-        alert(`Error saving: ${error.message}`);
-    }
 }
 
 /**
