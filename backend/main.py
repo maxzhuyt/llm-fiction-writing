@@ -176,11 +176,7 @@ async def evaluate(req: EvaluateRequest):
 
 @app.post("/api/export", response_class=PlainTextResponse)
 async def export_prompts(req: ExportRequest):
-    """Export prompts to text format."""
-    # Expand variables in prompts
-    expanded_system = expand_variables(req.system_prompt, req.outputs)
-    expanded_user = expand_variables(req.user_prompt, req.outputs)
-
+    """Export prompts to text format (variables kept as-is, not expanded)."""
     lines = [f"Step {req.step_num}: {req.step_title} - Exported Prompts"]
     lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append("")
@@ -194,8 +190,8 @@ async def export_prompts(req: ExportRequest):
 
         for i in range(req.step_num):
             step_data = req.all_prompts[i] if i < len(req.all_prompts) else {}
-            step_system = expand_variables(step_data.get("system", ""), req.outputs)
-            step_user = expand_variables(step_data.get("user", ""), req.outputs)
+            step_system = step_data.get("system", "")
+            step_user = step_data.get("user", "")
             step_output = req.outputs.get(f"step{i}_output", "")
 
             lines.append(f"--- Step {i} ---")
@@ -212,10 +208,10 @@ async def export_prompts(req: ExportRequest):
         lines.append("")
 
     lines.append("System Prompt:")
-    lines.append(expanded_system)
+    lines.append(req.system_prompt)
     lines.append("")
     lines.append("User Prompt:")
-    lines.append(expanded_user)
+    lines.append(req.user_prompt)
     lines.append("")
 
     return "\n".join(lines)
