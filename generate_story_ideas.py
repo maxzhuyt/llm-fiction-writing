@@ -23,8 +23,9 @@ from genres import ALL_GENRES
 
 # Configuration
 MODEL = "anthropic/claude-opus-4.5"
-NUM_IDEAS = 200
+NUM_IDEAS = 50
 MAX_TOKEN_ID = 75000
+REPRIME_EVERY = 1  # Regenerate priming context for every idea to avoid echoes
 
 # Load API key
 with open("credential", "r") as f:
@@ -134,7 +135,7 @@ def generate_idea_from_words(words, priming_context):
 Using at least 5 of these words as inspiration (not necessarily literally), generate a compelling story idea (3-4 sentences).
 Before you generate, think about:
 What is the core situation? What makes this story impossible to put down?
-What is the primary form this story should take? (such as personal letter, journal, interview transcript, bureaucratic report, diplomatic correspondence, research log, notebook, company memo, obituary, field notes, pamphlet, ad, telegram, etc.)
+What is the form that this story should take? (such as personal letter, journal, interview transcript, bureaucratic report, diplomatic correspondence, research log, notebook, company memo, obituary, field notes, pamphlet, ad, telegram, etc.)
 Your response should include the story idea only. No intro, no outro. Be specific. Avoid generic tropes."""
 
     messages = [
@@ -157,29 +158,33 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     print(f"\nOutput directory: {output_dir}")
 
-    # Step 1: Generate multi-genre priming
-    print("\n[Step 1/3] Generating multi-genre priming context...")
-    multi_genre_prime = prime_with_multi_genre_stories()
-    print(f"  Genres: {multi_genre_prime['genres']}")
-    print(f"  Time period: {multi_genre_prime['time_period']}")
-
-    # Step 2: Build vocabulary
-    print(f"\n[Step 2/3] Building vocabulary from tokenizer (max_id={MAX_TOKEN_ID})...")
+    # Step 1: Build vocabulary (do this first, only once)
+    print(f"\n[Step 1/2] Building vocabulary from tokenizer (max_id={MAX_TOKEN_ID})...")
     enc = tiktoken.get_encoding("cl100k_base")
     vocab_words = get_real_words_from_tokenizer(enc, max_id=MAX_TOKEN_ID)
     print(f"  Extracted {len(vocab_words)} real words")
 
-    # Step 3: Generate ideas
-    print(f"\n[Step 3/3] Generating {NUM_IDEAS} story ideas...")
+    # Step 2: Generate ideas (with periodic re-priming)
+    print(f"\n[Step 2/2] Generating {NUM_IDEAS} story ideas (re-priming every {REPRIME_EVERY})...")
 
     ideas = []
+    all_priming_contexts = []  # Track all priming contexts used
+    multi_genre_prime = None
+
     all_ideas_content = f"# Story Ideas Batch\n\n"
     all_ideas_content += f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    all_ideas_content += f"**Priming Genres:** {', '.join(multi_genre_prime['genres'])}\n"
-    all_ideas_content += f"**Time Period:** {multi_genre_prime['time_period']}\n\n"
+    all_ideas_content += f"**Re-priming every:** {REPRIME_EVERY} ideas\n\n"
     all_ideas_content += "---\n\n"
 
     for i in range(NUM_IDEAS):
+        # Regenerate priming every REPRIME_EVERY ideas
+        if i % REPRIME_EVERY == 0:
+            print(f"\n  [Re-priming with new genres...]")
+            multi_genre_prime = prime_with_multi_genre_stories()
+            all_priming_contexts.append(multi_genre_prime)
+            print(f"  Genres: {multi_genre_prime['genres']}")
+            print(f"  Time period: {multi_genre_prime['time_period']}\n")
+
         print(f"  Generating idea {i+1}/{NUM_IDEAS}...", end=" ", flush=True)
 
         try:
@@ -188,8 +193,11 @@ def main():
             idea = generate_idea_from_words(words, multi_genre_prime['priming_text'])
 
             # Store result
+            priming_idx = i // REPRIME_EVERY
             idea_data = {
                 "id": i + 1,
+                "priming_context_idx": priming_idx,
+                "priming_genres": multi_genre_prime['genres'],
                 "words": words,
                 "idea": idea
             }
@@ -197,15 +205,17 @@ def main():
 
             # Save individual file
             individual_content = f"# Story Idea {i+1:03d}\n\n"
+            individual_content += f"**Priming Genres:** {', '.join(multi_genre_prime['genres'])}\n"
             individual_content += f"**Words:** {', '.join(words)}\n\n"
             individual_content += "---\n\n"
             individual_content += idea
 
-            with open(f"{output_dir}/idea_{i+1:03d}.md", "w") as f:
+            with open(f"{output_dir}/idea_{i+1:03d}.txt", "w") as f:
                 f.write(individual_content)
 
             # Append to combined file
             all_ideas_content += f"## Idea {i+1:03d}\n\n"
+            all_ideas_content += f"**Priming Genres:** {', '.join(multi_genre_prime['genres'])}\n"
             all_ideas_content += f"**Words:** {', '.join(words)}\n\n"
             all_ideas_content += idea
             all_ideas_content += "\n\n---\n\n"
@@ -221,7 +231,7 @@ def main():
             })
 
     # Save combined file
-    with open(f"{output_dir}/all_ideas.md", "w") as f:
+    with open(f"{output_dir}/all_ideas.txt", "w") as f:
         f.write(all_ideas_content)
 
     # Save metadata
@@ -230,12 +240,16 @@ def main():
         "num_ideas": NUM_IDEAS,
         "model": MODEL,
         "max_token_id": MAX_TOKEN_ID,
+        "reprime_every": REPRIME_EVERY,
         "vocab_size": len(vocab_words),
-        "priming": {
-            "genres": multi_genre_prime['genres'],
-            "time_period": multi_genre_prime['time_period'],
-            "priming_text": multi_genre_prime['priming_text']
-        },
+        "priming_contexts": [
+            {
+                "genres": p['genres'],
+                "time_period": p['time_period'],
+                "priming_text": p['priming_text']
+            }
+            for p in all_priming_contexts
+        ],
         "ideas": ideas
     }
 
@@ -245,8 +259,8 @@ def main():
     print(f"\n{'=' * 60}")
     print(f"Complete! Generated {len([i for i in ideas if 'ERROR' not in i['idea']])} ideas")
     print(f"Output: {output_dir}/")
-    print(f"  - all_ideas.md (combined)")
-    print(f"  - idea_001.md to idea_{NUM_IDEAS:03d}.md (individual)")
+    print(f"  - all_ideas.txt (combined)")
+    print(f"  - idea_001.txt to idea_{NUM_IDEAS:03d}.txt (individual)")
     print(f"  - metadata.json")
     print("=" * 60)
 
