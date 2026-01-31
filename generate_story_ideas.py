@@ -210,7 +210,7 @@ def main():
             individual_content += "---\n\n"
             individual_content += idea
 
-            with open(f"{output_dir}/idea_{i+1:03d}.txt", "w") as f:
+            with open(f"{output_dir}/idea_{i+1:03d}.md", "w") as f:
                 f.write(individual_content)
 
             # Append to combined file
@@ -231,7 +231,7 @@ def main():
             })
 
     # Save combined file
-    with open(f"{output_dir}/all_ideas.txt", "w") as f:
+    with open(f"{output_dir}/all_ideas.md", "w") as f:
         f.write(all_ideas_content)
 
     # Save metadata
@@ -259,8 +259,8 @@ def main():
     print(f"\n{'=' * 60}")
     print(f"Complete! Generated {len([i for i in ideas if 'ERROR' not in i['idea']])} ideas")
     print(f"Output: {output_dir}/")
-    print(f"  - all_ideas.txt (combined)")
-    print(f"  - idea_001.txt to idea_{NUM_IDEAS:03d}.txt (individual)")
+    print(f"  - all_ideas.md (combined)")
+    print(f"  - idea_001.md to idea_{NUM_IDEAS:03d}.md (individual)")
     print(f"  - metadata.json")
     print("=" * 60)
 
