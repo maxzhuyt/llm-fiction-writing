@@ -27,6 +27,7 @@ Thumbs.db
 outputs/
 *.env
 .env.*
+credential
 
 # Streamlit
 .streamlit/secrets.toml
