@@ -80,7 +80,7 @@ def get_object(key):
     return resp["Body"].read().decode("utf-8")
 
 
-async def record_session(page, action, step_info, model_id, outputs):
+async def record_session(page, action, step_info, model_id, outputs, step_num=None):
     """Record a session event to S3 (fire-and-forget).
 
     Args:
@@ -89,6 +89,7 @@ async def record_session(page, action, step_info, model_id, outputs):
         step_info: dict with step-specific data (num, title, prompts, etc.)
         model_id: the model used
         outputs: current outputs dict
+        step_num: step number (0, 1, 2, etc.) or None for actions without a step
     """
     if not is_configured():
         return
@@ -105,9 +106,10 @@ async def record_session(page, action, step_info, model_id, outputs):
         }
         body = json.dumps(record, indent=2)
         date_str = now.strftime("%Y-%m-%d")
-        ts_str = now.strftime("%H%M%S")
+        ts_str = now.strftime("%d-%H-%M-%S")
         uid = uuid.uuid4().hex[:8]
-        key = f"sessions/{page}/{date_str}/{ts_str}_{uid}.json"
+        step_part = f"_step{step_num}" if step_num is not None else ""
+        key = f"sessions/{page}/{date_str}/{ts_str}_{action}{step_part}_{uid}.json"
 
         loop = asyncio.get_event_loop()
         loop.run_in_executor(None, _upload_to_s3, key, body)

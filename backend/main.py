@@ -270,6 +270,7 @@ async def generate(req: GenerateRequest):
         step_info={"step_num": req.step_num, "system_prompt": req.system_prompt, "user_prompt": req.user_prompt},
         model_id=req.model_id,
         outputs={**req.outputs, f"step{req.step_num}_output": result},
+        step_num=req.step_num,
     )
 
     return {"output": result}
@@ -481,6 +482,7 @@ async def generate_idea(req: IdeaGenerateRequest):
         step_info={"step_num": req.step_num, "system_prompt": req.system_prompt, "user_prompt": req.user_prompt},
         model_id=req.model_id,
         outputs={**req.outputs, output_var: result},
+        step_num=req.step_num,
     )
 
     return {"output": result}
