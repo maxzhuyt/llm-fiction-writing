@@ -3,8 +3,12 @@
  */
 
 // Output variable names for the ideas page
-const IDEA_VARS = ["priming_output", "idea_output", "postprocess_output"];
+const IDEA_VARS = [
+    "priming_output", "idea_output", "postprocess_output",
+    "step0_output", "step1_output", "step2_output"
+];
 const OUTPUT_VAR_MAP = { 0: "priming_output", 1: "idea_output", 2: "postprocess_output" };
+const STEP_ALIAS_MAP = { 0: "step0_output", 1: "step1_output", 2: "step2_output" };
 
 // Application state
 const state = {
@@ -13,7 +17,10 @@ const state = {
     outputs: {
         priming_output: "",
         idea_output: "",
-        postprocess_output: ""
+        postprocess_output: "",
+        step0_output: "",
+        step1_output: "",
+        step2_output: ""
     },
     authenticated: false
 };
@@ -245,7 +252,9 @@ async function handleGenerate(stepNum) {
 
         if (response.ok) {
             const outputVar = OUTPUT_VAR_MAP[stepNum];
+            const aliasVar = STEP_ALIAS_MAP[stepNum];
             state.outputs[outputVar] = data.output;
+            state.outputs[aliasVar] = data.output;
             displayOutput(stepNum, data.output);
             saveState();
             // Update variable status for subsequent steps
@@ -447,9 +456,12 @@ function loadState() {
         // Restore outputs
         if (data.outputs) {
             state.outputs = data.outputs;
+            // Sync step aliases with named vars
             for (let i = 0; i <= 2; i++) {
                 const outputVar = OUTPUT_VAR_MAP[i];
+                const aliasVar = STEP_ALIAS_MAP[i];
                 if (state.outputs[outputVar]) {
+                    state.outputs[aliasVar] = state.outputs[outputVar];
                     displayOutput(i, state.outputs[outputVar]);
                 }
             }
