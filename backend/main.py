@@ -131,7 +131,7 @@ async def ideas_page(request: Request):
             "models": AVAILABLE_MODELS,
             "idea_steps": IDEA_STEPS,
             "has_env_api_key": bool(OPENROUTER_API_KEY),
-            "has_password": bool(APP_PASSWORD),
+            "has_password": False,
         }
     )
 
@@ -145,7 +145,7 @@ async def sessions_page(request: Request):
             "request": request,
             "models": AVAILABLE_MODELS,
             "has_env_api_key": bool(OPENROUTER_API_KEY),
-            "has_password": bool(APP_PASSWORD),
+            "has_password": False,
             "s3_configured": s3_service.is_configured(),
         }
     )

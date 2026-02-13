@@ -34,13 +34,12 @@ function init() {
     // Initialize CodeMirror editors
     window.StoryEditor.initAllEditors();
 
-    // Check for password gate
-    if (window.APP_CONFIG.hasPassword) {
-        checkAuthentication();
-    } else {
-        state.authenticated = true;
-        hidePasswordModal();
+    // Redirect to home page for authentication if needed
+    if (window.APP_CONFIG.hasPassword && localStorage.getItem("story-engine-auth") !== "true") {
+        window.location.href = "/";
+        return;
     }
+    state.authenticated = true;
 
     // Set up API key handling
     setupApiKey();
@@ -59,11 +58,6 @@ function init() {
  * Cache commonly used DOM elements
  */
 function cacheElements() {
-    elements.passwordModal = document.getElementById("password-modal");
-    elements.passwordInput = document.getElementById("password-input");
-    elements.loginBtn = document.getElementById("login-btn");
-    elements.passwordError = document.getElementById("password-error");
-
     elements.apiKeyInput = document.getElementById("api-key");
     elements.overrideCheckbox = document.getElementById("override-api-key");
     elements.apiKeyOverride = document.getElementById("api-key-override");
@@ -76,23 +70,6 @@ function cacheElements() {
     elements.sampleGenresBtn = document.getElementById("sample-genres-btn");
     elements.sampleWordsBtn = document.getElementById("sample-words-btn");
     elements.includePriming = document.getElementById("include-priming");
-}
-
-/**
- * Check if user is authenticated
- */
-function checkAuthentication() {
-    const savedAuth = localStorage.getItem("story-engine-auth");
-    if (savedAuth === "true") {
-        state.authenticated = true;
-        hidePasswordModal();
-    }
-}
-
-function hidePasswordModal() {
-    if (elements.passwordModal) {
-        elements.passwordModal.style.display = "none";
-    }
 }
 
 /**
@@ -112,16 +89,6 @@ function setupApiKey() {
  * Set up all event listeners
  */
 function setupEventListeners() {
-    // Password login
-    if (elements.loginBtn) {
-        elements.loginBtn.addEventListener("click", handleLogin);
-    }
-    if (elements.passwordInput) {
-        elements.passwordInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") handleLogin();
-        });
-    }
-
     // API key override checkbox
     if (elements.overrideCheckbox) {
         elements.overrideCheckbox.addEventListener("change", (e) => {
@@ -189,32 +156,6 @@ function setupEventListeners() {
             }
         });
     });
-}
-
-/**
- * Handle password login
- */
-async function handleLogin() {
-    const password = elements.passwordInput.value;
-    try {
-        const response = await fetch("/api/check-password", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password })
-        });
-        const data = await response.json();
-        if (data.valid) {
-            state.authenticated = true;
-            localStorage.setItem("story-engine-auth", "true");
-            hidePasswordModal();
-        } else {
-            elements.passwordError.style.display = "block";
-        }
-    } catch (error) {
-        console.error("Login error:", error);
-        elements.passwordError.textContent = "Error checking password";
-        elements.passwordError.style.display = "block";
-    }
 }
 
 /**

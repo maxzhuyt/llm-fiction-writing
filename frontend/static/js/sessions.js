@@ -168,47 +168,6 @@
         }
     }
 
-    // ── Password gate ──
-
-    function setupPasswordModal() {
-        const modal = document.getElementById('password-modal');
-        if (!modal) return;
-        const input = document.getElementById('password-input');
-        const loginBtn = document.getElementById('login-btn');
-        const error = document.getElementById('password-error');
-
-        if (localStorage.getItem('story-engine-auth') === 'true') {
-            modal.style.display = 'none';
-            return;
-        }
-
-        async function handleLogin() {
-            try {
-                const resp = await fetch('/api/check-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: input.value }),
-                });
-                const data = await resp.json();
-                if (data.valid) {
-                    localStorage.setItem('story-engine-auth', 'true');
-                    modal.style.display = 'none';
-                    init();
-                } else {
-                    error.style.display = 'block';
-                }
-            } catch (e) {
-                error.textContent = 'Error checking password';
-                error.style.display = 'block';
-            }
-        }
-
-        loginBtn.addEventListener('click', handleLogin);
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleLogin();
-        });
-    }
-
     // ── Init ──
 
     closeBtn.addEventListener('click', () => {
@@ -220,13 +179,13 @@
     function init() {
         if (initialized) return;
         if (window.APP_CONFIG.hasPassword && localStorage.getItem('story-engine-auth') !== 'true') {
-            return; // wait for password modal login handler to call init()
+            window.location.href = '/';
+            return;
         }
         initialized = true;
         loadRoot();
     }
 
-    setupPasswordModal();
     document.addEventListener('DOMContentLoaded', init);
     if (document.readyState !== 'loading') init();
 })();
