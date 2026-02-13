@@ -1,31 +1,31 @@
 """
 Variable interpolation service for Story Engine.
-Handles stepN_output variable detection and expansion.
+Handles variable detection and expansion for both story steps and idea steps.
 """
 
 import re
 from typing import Dict, List
 
+# Matches step0_output, step1_output, priming_output, idea_output, postprocess_output
+VARIABLE_PATTERN = r'\b((?:step\d+|priming|idea|postprocess)_output)\b'
+
 
 def expand_variables(text: str, outputs: Dict[str, str]) -> str:
-    """Replace stepN_output placeholders with actual values.
+    """Replace variable placeholders with actual values.
 
     Args:
         text: Text containing variable placeholders
         outputs: Dict mapping variable names to their values
-                e.g., {"step0_output": "...", "step1_output": "..."}
 
     Returns:
         Text with placeholders replaced by actual values
     """
-    pattern = r'\b(step\d+_output)\b'
-
     def replace_match(match):
         var_name = match.group(1)
         value = outputs.get(var_name, "")
         return value if value else f"[{var_name} not yet generated]"
 
-    return re.sub(pattern, replace_match, text)
+    return re.sub(VARIABLE_PATTERN, replace_match, text)
 
 
 def get_detected_variables(text: str) -> List[str]:
@@ -35,10 +35,9 @@ def get_detected_variables(text: str) -> List[str]:
         text: Text to search for variables
 
     Returns:
-        List of unique variable names found (e.g., ["step0_output", "step1_output"])
+        List of unique variable names found
     """
-    pattern = r'\b(step\d+_output)\b'
-    return list(set(re.findall(pattern, text)))
+    return list(set(re.findall(VARIABLE_PATTERN, text)))
 
 
 def has_variables(text: str) -> bool:
@@ -48,10 +47,9 @@ def has_variables(text: str) -> bool:
         text: Text to check
 
     Returns:
-        True if text contains stepN_output patterns
+        True if text contains variable patterns
     """
-    pattern = r'\bstep\d+_output\b'
-    return bool(re.search(pattern, text))
+    return bool(re.search(VARIABLE_PATTERN, text))
 
 
 def get_available_variables(current_step: int, outputs: Dict[str, str]) -> List[str]:

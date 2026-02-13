@@ -3,6 +3,9 @@ Story Engine - FastAPI Backend
 Main application with routes for LLM generation, export, and session management.
 """
 
+import random
+import logging
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -18,9 +21,15 @@ from .config import (
     OPENROUTER_API_KEY,
     APP_PASSWORD,
     STEPS,
+    IDEA_STEPS,
+    ALL_GENRES,
 )
 from .llm_service import get_client, call_llm
 from .variable_service import expand_variables, validate_variables
+from . import s3_service
+from . import vocab_service
+
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(title="Story Engine")
@@ -39,6 +48,14 @@ app.mount(
 templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
 
 
+# Pre-warm vocabulary in a background thread at startup
+@app.on_event("startup")
+async def startup_event():
+    thread = threading.Thread(target=vocab_service.warm_up, daemon=True)
+    thread.start()
+    logger.info("Vocabulary warm-up started in background thread")
+
+
 # Pydantic models for request/response
 class GenerateRequest(BaseModel):
     api_key: str
@@ -48,6 +65,16 @@ class GenerateRequest(BaseModel):
     outputs: Dict[str, str] = {}
     include_previous: bool = False
     step_num: int = 0
+
+
+class IdeaGenerateRequest(BaseModel):
+    api_key: str
+    model_id: str
+    system_prompt: str
+    user_prompt: str
+    outputs: Dict[str, str] = {}
+    step_num: int = 0
+    include_priming: bool = True
 
 
 class EvaluateRequest(BaseModel):
@@ -76,10 +103,11 @@ class PasswordCheckRequest(BaseModel):
     password: str
 
 
-# Routes
+# ─── Page Routes ───
+
 @app.get("/")
 async def index(request: Request):
-    """Serve the main page."""
+    """Serve the main story page."""
     return templates.TemplateResponse(
         "index.html",
         {
@@ -91,6 +119,23 @@ async def index(request: Request):
         }
     )
 
+
+@app.get("/ideas")
+async def ideas_page(request: Request):
+    """Serve the idea generator page."""
+    return templates.TemplateResponse(
+        "ideas.html",
+        {
+            "request": request,
+            "models": AVAILABLE_MODELS,
+            "idea_steps": IDEA_STEPS,
+            "has_env_api_key": bool(OPENROUTER_API_KEY),
+            "has_password": bool(APP_PASSWORD),
+        }
+    )
+
+
+# ─── Shared API Routes ───
 
 @app.get("/api/models")
 async def get_models():
@@ -117,9 +162,11 @@ async def check_password(req: PasswordCheckRequest):
     return {"valid": req.password == APP_PASSWORD}
 
 
+# ─── Story Generation Routes ───
+
 @app.post("/api/generate")
 async def generate(req: GenerateRequest):
-    """Generate LLM output for a step."""
+    """Generate LLM output for a story step."""
     # Use provided API key or fall back to environment variable
     api_key = req.api_key or OPENROUTER_API_KEY
     if not api_key:
@@ -151,6 +198,15 @@ async def generate(req: GenerateRequest):
         previous_context
     )
 
+    # Record to S3
+    await s3_service.record_session(
+        page="story",
+        action="generate",
+        step_info={"step_num": req.step_num, "system_prompt": req.system_prompt, "user_prompt": req.user_prompt},
+        model_id=req.model_id,
+        outputs={**req.outputs, f"step{req.step_num}_output": result},
+    )
+
     return {"output": result}
 
 
@@ -171,6 +227,15 @@ async def evaluate(req: EvaluateRequest):
         req.model_id,
         req.system_prompt,
         expanded_user_prompt
+    )
+
+    # Record to S3
+    await s3_service.record_session(
+        page="story",
+        action="evaluate",
+        step_info={"system_prompt": req.system_prompt, "user_prompt": req.user_prompt},
+        model_id=req.model_id,
+        outputs=req.outputs,
     )
 
     return {"response": result}
@@ -260,6 +325,100 @@ async def validate_vars(outputs: Dict[str, str], text: str):
     """Validate variables in text."""
     result = validate_variables(text, outputs)
     return result
+
+
+# ─── Idea Generation Routes ───
+
+@app.post("/api/ideas/sample-genres")
+async def sample_genres():
+    """Sample random genres and generate a priming prompt."""
+    sampled = random.sample(ALL_GENRES, 5)
+    start_year = random.randrange(1910, 1971, 10)
+    end_year = start_year + 50
+    time_period = f"{start_year}-{end_year}"
+
+    genre_list = "\n".join(f"- {genre}" for genre in sampled)
+
+    prompt = f"""Let's warm up your creative circuits. Here are 5 randomly selected literary genres:
+{genre_list}
+
+For each genre, recall ONE famous story (published roughly around {time_period}) that exemplifies it.
+For each story, explain in 1-2 sentences what narrative technique or structural choice made it memorable.
+Focus on specific craft elements: how did the author create tension, develop character, and subvert expectations? What makes the ending particularly memorable or surprising?"""
+
+    return {"prompt": prompt, "genres": sampled, "time_period": time_period}
+
+
+@app.post("/api/ideas/sample-words")
+async def sample_words():
+    """Sample random words from vocabulary and generate an idea prompt."""
+    words = vocab_service.sample_words(20)
+    word_list = ", ".join(words)
+
+    prompt = f"""Here are 20 randomly selected words:
+
+{word_list}
+
+Using at least 5 of these words as inspiration (not necessarily literally), generate a compelling story idea (3-4 sentences).
+Before you generate, think about:
+What is the core situation? What makes this story impossible to put down?
+What is the form that this story should take? (such as personal letter, journal, interview transcript, bureaucratic report, diplomatic correspondence, research log, notebook, company memo, obituary, field notes, pamphlet, ad, telegram, etc.)
+Your response should include the story idea only. No intro, no outro. Be specific. Avoid generic tropes."""
+
+    return {"prompt": prompt, "words": words}
+
+
+@app.post("/api/ideas/generate")
+async def generate_idea(req: IdeaGenerateRequest):
+    """Generate LLM output for an idea step."""
+    api_key = req.api_key or OPENROUTER_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API key is required")
+
+    # Expand variables in the user prompt
+    expanded_user_prompt = expand_variables(req.user_prompt, req.outputs)
+
+    # Build context based on step
+    previous_context = None
+    if req.step_num == 1 and req.include_priming:
+        # For idea generation step, include priming output as assistant message
+        # This matches the pattern from generate_story_ideas.py
+        priming_output = req.outputs.get("priming_output", "")
+        if priming_output:
+            previous_context = [{"assistant": priming_output}]
+    elif req.step_num == 2:
+        # For post-processing, include full context chain
+        context_parts = []
+        priming = req.outputs.get("priming_output", "")
+        if priming:
+            context_parts.append({"assistant": priming})
+        idea_user = req.outputs.get("idea_step1_user", "")
+        idea_output = req.outputs.get("idea_output", "")
+        if idea_user or idea_output:
+            context_parts.append({"user": idea_user, "assistant": idea_output})
+        if context_parts:
+            previous_context = context_parts
+
+    client = get_client(api_key)
+    result = await call_llm(
+        client,
+        req.model_id,
+        req.system_prompt,
+        expanded_user_prompt,
+        previous_context
+    )
+
+    # Record to S3
+    output_var = IDEA_STEPS[req.step_num]["output_var"] if req.step_num < len(IDEA_STEPS) else f"step{req.step_num}_output"
+    await s3_service.record_session(
+        page="ideas",
+        action="generate",
+        step_info={"step_num": req.step_num, "system_prompt": req.system_prompt, "user_prompt": req.user_prompt},
+        model_id=req.model_id,
+        outputs={**req.outputs, output_var: result},
+    )
+
+    return {"output": result}
 
 
 # Create __init__.py for backend package

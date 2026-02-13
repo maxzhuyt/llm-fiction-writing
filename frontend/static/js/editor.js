@@ -1,14 +1,42 @@
 /**
  * Story Engine - CodeMirror Editor Setup
- * Custom mode for variable highlighting and autocomplete
+ * Custom mode for variable highlighting and autocomplete.
+ * Supports configurable variable sets via setAvailableVariables().
  */
+
+// All available variables for autocomplete (default for story page)
+let AVAILABLE_VARIABLES = ["step0_output", "step1_output", "step2_output"];
+
+// Build regex from variable list
+let variableRegex = buildVariableRegex(AVAILABLE_VARIABLES);
+
+/**
+ * Build a regex that matches any of the given variable names
+ * @param {string[]} vars - Variable names to match
+ * @returns {RegExp}
+ */
+function buildVariableRegex(vars) {
+    // Build alternation pattern from variable names
+    const pattern = vars.map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join("|");
+    return new RegExp(pattern);
+}
+
+/**
+ * Set available variables for highlighting and autocomplete.
+ * Call before initAllEditors() to configure for the current page.
+ * @param {string[]} vars - Array of variable names
+ */
+function setAvailableVariables(vars) {
+    AVAILABLE_VARIABLES = vars;
+    variableRegex = buildVariableRegex(vars);
+}
 
 // Define custom mode for variable highlighting
 CodeMirror.defineMode("story-variables", function() {
     return {
         token: function(stream) {
-            // Check for step variable pattern
-            if (stream.match(/step[0-2]_output/)) {
+            // Check for any variable pattern
+            if (stream.match(variableRegex)) {
                 return "variable-highlight";
             }
             // Move forward one character if no match
@@ -18,8 +46,18 @@ CodeMirror.defineMode("story-variables", function() {
     };
 });
 
-// All available variables for autocomplete
-const AVAILABLE_VARIABLES = ["step0_output", "step1_output", "step2_output"];
+/**
+ * Determine autocomplete trigger prefix from available variables.
+ * Returns common prefixes to trigger on (e.g., "step", "prim", "idea", "post").
+ */
+function getAutocompletePrefixes() {
+    const prefixes = new Set();
+    for (const v of AVAILABLE_VARIABLES) {
+        // Use first 4 chars as trigger prefix
+        prefixes.add(v.substring(0, 4).toLowerCase());
+    }
+    return [...prefixes];
+}
 
 /**
  * Custom hint function for variable autocomplete
@@ -38,8 +76,7 @@ function variableHint(editor) {
 
     const word = line.substring(start, cursor.ch).toLowerCase();
 
-    // Only show hints if typing something that looks like a variable
-    if (!word.startsWith("step") || word.length < 4) {
+    if (word.length < 3) {
         return null;
     }
 
@@ -107,8 +144,9 @@ function initEditor(textarea, options = {}) {
             }
             const word = line.substring(start, cursor.ch).toLowerCase();
 
-            // Show hints if typing "step"
-            if (word.startsWith("step") && word.length >= 4) {
+            // Show hints if typing matches any autocomplete prefix
+            const prefixes = getAutocompletePrefixes();
+            if (word.length >= 4 && prefixes.some(p => word.startsWith(p))) {
                 cm.showHint({
                     hint: variableHint,
                     completeSingle: false
@@ -188,11 +226,12 @@ function setEditorValue(id, value) {
     }
 }
 
-// Export functions for use in app.js
+// Export functions for use in app.js / ideas.js
 window.StoryEditor = {
     initAllEditors,
     getEditor,
     getEditorValue,
     setEditorValue,
+    setAvailableVariables,
     editors
 };

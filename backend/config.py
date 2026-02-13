@@ -3,9 +3,14 @@ Configuration for Story Engine - models, default prompts, environment variables.
 """
 
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Add parent dir to path so we can import genres.py
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from genres import ALL_GENRES  # noqa: E402
 
 # Environment variables
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -45,7 +50,7 @@ DEFAULT_STEP1_USER = ""
 DEFAULT_STEP2_SYSTEM = "Write a story based on the to-do list provided."
 DEFAULT_STEP2_USER = ""
 
-# Step metadata
+# Story step metadata
 STEPS = [
     {
         "num": 0,
@@ -67,5 +72,33 @@ STEPS = [
         "button_label": "Generate Story",
         "default_system": DEFAULT_STEP2_SYSTEM,
         "default_user": DEFAULT_STEP2_USER,
+    },
+]
+
+# Idea generation step metadata
+IDEA_STEPS = [
+    {
+        "num": 0,
+        "title": "Priming",
+        "button_label": "Generate Priming",
+        "output_var": "priming_output",
+        "default_system": "You are a literary analyst with deep knowledge of storytelling across genres and eras.",
+        "default_user": "",
+    },
+    {
+        "num": 1,
+        "title": "Idea Generation",
+        "button_label": "Generate Idea",
+        "output_var": "idea_output",
+        "default_system": "You are a creative writing expert who just analyzed what makes great stories work.",
+        "default_user": "",
+    },
+    {
+        "num": 2,
+        "title": "Post-Processing",
+        "button_label": "Generate",
+        "output_var": "postprocess_output",
+        "default_system": "You are a creative writing expert.",
+        "default_user": "",
     },
 ]

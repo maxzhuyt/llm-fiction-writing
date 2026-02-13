@@ -1,269 +1,193 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Story Engine</title>
+{% extends "base.html" %}
 
-    <!-- CodeMirror 5 CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+{% block title %}Story Engine{% endblock %}
 
-    <!-- Custom styles -->
-    <link rel="stylesheet" href="/static/css/main.css">
-</head>
-<body>
-    <!-- Password Gate Modal -->
-    {% if has_password %}
-    <div id="password-modal" class="modal">
-        <div class="modal-content">
-            <h2>Protected App</h2>
-            <input type="password" id="password-input" placeholder="Enter password">
-            <div class="modal-buttons">
-                <button id="login-btn" class="btn btn-primary">Login</button>
+{% block nav_links %}
+<a href="/" class="sidebar-nav-btn active">Story Engine</a>
+<a href="/ideas" class="sidebar-nav-btn">Idea Generator</a>
+{% endblock %}
+
+{% block variables_help %}
+<details class="help-section">
+    <summary>How to use variables</summary>
+    <p>Reference previous outputs in your prompts:</p>
+    <p>Type <code>step0_output</code>, <code>step1_output</code>, etc. directly in any User Prompt field.</p>
+    <p>The system will automatically replace these with the actual generated content when sending to the LLM.</p>
+</details>
+{% endblock %}
+
+{% block content %}
+<h1>Story Engine</h1>
+
+<div id="api-key-warning" class="warning" style="display: none;">
+    Enter an OpenRouter API key in the sidebar to enable generation.
+</div>
+
+<!-- Steps Container -->
+<div class="steps-container">
+    {% for step in steps %}
+    <section class="step-section" data-step="{{ step.num }}">
+        <h2>Step {{ step.num }}: {{ step.title }}</h2>
+
+        <!-- System Prompt -->
+        <div class="prompt-section">
+            <label>System Prompt</label>
+            <div class="editor-container">
+                <div class="editor-wrapper">
+                    <textarea id="step{{ step.num }}-system" class="code-editor" data-field="system">{{ step.default_system }}</textarea>
+                </div>
+                <div class="editor-buttons">
+                    <button class="btn btn-small edit-toggle-btn" data-editor="step{{ step.num }}-system" data-editing="true">Done</button>
+                    <button class="btn btn-small editor-copy-btn" data-editor="step{{ step.num }}-system" title="Copy to clipboard">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <p id="password-error" class="error-text" style="display: none;">Wrong password</p>
         </div>
-    </div>
-    {% endif %}
 
-    <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <h2>Configuration</h2>
-
-            <!-- API Key Section -->
-            <div class="sidebar-section">
-                <h3>API Key</h3>
-                {% if has_env_api_key %}
-                <div class="env-key-notice">
-                    <span class="success-badge">API Key configured from environment</span>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="override-api-key">
-                        Override API key
-                    </label>
+        <!-- User Prompt -->
+        <div class="prompt-section">
+            <label>User Prompt</label>
+            <div class="editor-container">
+                <div class="editor-wrapper">
+                    <textarea id="step{{ step.num }}-user" class="code-editor" data-field="user">{{ step.default_user }}</textarea>
                 </div>
-                <div id="api-key-override" style="display: none;">
-                    <input type="password" id="api-key" placeholder="Enter a different API key">
+                <div class="editor-buttons">
+                    <button class="btn btn-small edit-toggle-btn" data-editor="step{{ step.num }}-user" data-editing="true">Done</button>
+                    <button class="btn btn-small editor-copy-btn" data-editor="step{{ step.num }}-user" title="Copy to clipboard">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
                 </div>
-                {% else %}
-                <input type="password" id="api-key" placeholder="Enter your OpenRouter API key">
-                {% endif %}
             </div>
+            <div id="step{{ step.num }}-variables" class="variables-status"></div>
+        </div>
 
-            <!-- Model Selection -->
-            <div class="sidebar-section">
-                <h3>Model</h3>
-                <select id="model-select">
+        <!-- Include Previous Checkbox (for steps > 0) -->
+        {% if step.num > 0 %}
+        <label class="checkbox-label">
+            <input type="checkbox" id="step{{ step.num }}-include-prev">
+            {% if step.num == 1 %}
+            Build on Step 0
+            {% else %}
+            Build on previous steps
+            {% endif %}
+        </label>
+        {% endif %}
+
+        <!-- Buttons -->
+        <div class="button-row">
+            <button class="btn btn-primary generate-btn" data-step="{{ step.num }}">
+                {{ step.button_label }}
+            </button>
+            <button class="btn btn-secondary export-btn" data-step="{{ step.num }}">
+                Export Prompts
+            </button>
+        </div>
+
+        <!-- Output -->
+        <div class="output-section" id="step{{ step.num }}-output-section" style="display: none;">
+            <label>Output</label>
+            <div class="output-wrapper">
+                <div id="step{{ step.num }}-output" class="output-display"></div>
+                <button class="copy-btn" data-step="{{ step.num }}" title="Copy to clipboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <hr class="step-divider">
+    </section>
+    {% endfor %}
+</div>
+
+<!-- Export Session Button -->
+<div id="save-session-container" class="session-actions" style="display: none;">
+    <button id="export-full-session-btn" class="btn btn-primary">Export Full Session</button>
+</div>
+
+<!-- Evaluation Panel -->
+<section class="evaluation-panel">
+    <details>
+        <summary><h2>Evaluate Text with LLM</h2></summary>
+
+        <div class="eval-content">
+            <!-- Model selection for evaluation -->
+            <div class="eval-model-section">
+                <label>Model for evaluation</label>
+                <select id="eval-model-select">
                     {% for name, id in models.items() %}
                     <option value="{{ id }}">{{ name }}</option>
                     {% endfor %}
                 </select>
             </div>
 
-            <!-- Variables Help -->
-            <div class="sidebar-section">
-                <details class="help-section">
-                    <summary>How to use variables</summary>
-                    <p>Reference previous outputs in your prompts:</p>
-                    <p>Type <code>step0_output</code>, <code>step1_output</code>, etc. directly in any User Prompt field.</p>
-                    <p>The system will automatically replace these with the actual generated content when sending to the LLM.</p>
-                </details>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="content">
-            <h1>Story Engine</h1>
-
-            <div id="api-key-warning" class="warning" style="display: none;">
-                Enter an OpenRouter API key in the sidebar to enable generation.
-            </div>
-
-            <!-- Steps Container -->
-            <div class="steps-container">
-                {% for step in steps %}
-                <section class="step-section" data-step="{{ step.num }}">
-                    <h2>Step {{ step.num }}: {{ step.title }}</h2>
-
-                    <!-- System Prompt -->
-                    <div class="prompt-section">
-                        <label>System Prompt</label>
-                        <div class="editor-container">
-                            <div class="editor-wrapper">
-                                <textarea id="step{{ step.num }}-system" class="code-editor" data-field="system">{{ step.default_system }}</textarea>
-                            </div>
-                            <div class="editor-buttons">
-                                <button class="btn btn-small edit-toggle-btn" data-editor="step{{ step.num }}-system" data-editing="true">Done</button>
-                                <button class="btn btn-small editor-copy-btn" data-editor="step{{ step.num }}-system" title="Copy to clipboard">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
+            <!-- System Prompt -->
+            <div class="prompt-section">
+                <label>System Prompt</label>
+                <div class="editor-container">
+                    <div class="editor-wrapper">
+                        <textarea id="eval-system" class="code-editor">Evaluate stories.</textarea>
                     </div>
-
-                    <!-- User Prompt -->
-                    <div class="prompt-section">
-                        <label>User Prompt</label>
-                        <div class="editor-container">
-                            <div class="editor-wrapper">
-                                <textarea id="step{{ step.num }}-user" class="code-editor" data-field="user">{{ step.default_user }}</textarea>
-                            </div>
-                            <div class="editor-buttons">
-                                <button class="btn btn-small edit-toggle-btn" data-editor="step{{ step.num }}-user" data-editing="true">Done</button>
-                                <button class="btn btn-small editor-copy-btn" data-editor="step{{ step.num }}-user" title="Copy to clipboard">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="step{{ step.num }}-variables" class="variables-status"></div>
-                    </div>
-
-                    <!-- Include Previous Checkbox (for steps > 0) -->
-                    {% if step.num > 0 %}
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="step{{ step.num }}-include-prev">
-                        {% if step.num == 1 %}
-                        Build on Step 0
-                        {% else %}
-                        Build on previous steps
-                        {% endif %}
-                    </label>
-                    {% endif %}
-
-                    <!-- Buttons -->
-                    <div class="button-row">
-                        <button class="btn btn-primary generate-btn" data-step="{{ step.num }}">
-                            {{ step.button_label }}
-                        </button>
-                        <button class="btn btn-secondary export-btn" data-step="{{ step.num }}">
-                            Export Prompts
+                    <div class="editor-buttons">
+                        <button class="btn btn-small edit-toggle-btn" data-editor="eval-system" data-editing="true">Done</button>
+                        <button class="btn btn-small editor-copy-btn" data-editor="eval-system" title="Copy to clipboard">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
                         </button>
                     </div>
-
-                    <!-- Output -->
-                    <div class="output-section" id="step{{ step.num }}-output-section" style="display: none;">
-                        <label>Output</label>
-                        <div class="output-wrapper">
-                            <div id="step{{ step.num }}-output" class="output-display"></div>
-                            <button class="copy-btn" data-step="{{ step.num }}" title="Copy to clipboard">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <hr class="step-divider">
-                </section>
-                {% endfor %}
+                </div>
             </div>
 
-            <!-- Export Session Button -->
-            <div id="save-session-container" class="session-actions" style="display: none;">
-                <button id="export-full-session-btn" class="btn btn-primary">Export Full Session</button>
-            </div>
-
-            <!-- Evaluation Panel -->
-            <section class="evaluation-panel">
-                <details>
-                    <summary><h2>Evaluate Text with LLM</h2></summary>
-
-                    <div class="eval-content">
-                        <!-- Model selection for evaluation -->
-                        <div class="eval-model-section">
-                            <label>Model for evaluation</label>
-                            <select id="eval-model-select">
-                                {% for name, id in models.items() %}
-                                <option value="{{ id }}">{{ name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- System Prompt -->
-                        <div class="prompt-section">
-                            <label>System Prompt</label>
-                            <div class="editor-container">
-                                <div class="editor-wrapper">
-                                    <textarea id="eval-system" class="code-editor">Evaluate stories.</textarea>
-                                </div>
-                                <div class="editor-buttons">
-                                    <button class="btn btn-small edit-toggle-btn" data-editor="eval-system" data-editing="true">Done</button>
-                                    <button class="btn btn-small editor-copy-btn" data-editor="eval-system" title="Copy to clipboard">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- User Prompt (supports variables) -->
-                        <div class="prompt-section">
-                            <label>User Prompt <span class="hint">(use step0_output, step1_output, step2_output to insert generated content)</span></label>
-                            <div class="editor-container">
-                                <div class="editor-wrapper">
-                                    <textarea id="eval-user" class="code-editor">Read the following story and provide your evaluation:
+            <!-- User Prompt (supports variables) -->
+            <div class="prompt-section">
+                <label>User Prompt <span class="hint">(use step0_output, step1_output, step2_output to insert generated content)</span></label>
+                <div class="editor-container">
+                    <div class="editor-wrapper">
+                        <textarea id="eval-user" class="code-editor">Read the following story and provide your evaluation:
 
 step2_output</textarea>
-                                </div>
-                                <div class="editor-buttons">
-                                    <button class="btn btn-small edit-toggle-btn" data-editor="eval-user" data-editing="true">Done</button>
-                                    <button class="btn btn-small editor-copy-btn" data-editor="eval-user" title="Copy to clipboard">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="eval-variables" class="variables-status"></div>
-                        </div>
-
-                        <!-- Buttons -->
-                        <div class="button-row">
-                            <button id="eval-btn" class="btn btn-primary">Evaluate</button>
-                            <button id="eval-clear-btn" class="btn btn-secondary">Clear History</button>
-                        </div>
-
-                        <!-- Evaluation History -->
-                        <div id="eval-history"></div>
                     </div>
-                </details>
-            </section>
-        </main>
-    </div>
+                    <div class="editor-buttons">
+                        <button class="btn btn-small edit-toggle-btn" data-editor="eval-user" data-editing="true">Done</button>
+                        <button class="btn btn-small editor-copy-btn" data-editor="eval-user" title="Copy to clipboard">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="eval-variables" class="variables-status"></div>
+            </div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay" style="display: none;">
-        <div class="spinner"></div>
-        <span id="loading-text">Generating...</span>
-    </div>
+            <!-- Buttons -->
+            <div class="button-row">
+                <button id="eval-btn" class="btn btn-primary">Evaluate</button>
+                <button id="eval-clear-btn" class="btn btn-secondary">Clear History</button>
+            </div>
 
-    <!-- CodeMirror 5 JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+            <!-- Evaluation History -->
+            <div id="eval-history"></div>
+        </div>
+    </details>
+</section>
+{% endblock %}
 
-    <!-- App scripts -->
-    <script src="/static/js/editor.js"></script>
-    <script src="/static/js/app.js"></script>
+{% block page_scripts %}
+<script src="/static/js/app.js"></script>
+{% endblock %}
 
-    <!-- Initialize with server data -->
-    <script>
-        window.APP_CONFIG = {
-            hasEnvApiKey: {{ 'true' if has_env_api_key else 'false' }},
-            hasPassword: {{ 'true' if has_password else 'false' }},
-            models: {{ models | tojson | safe }},
-            steps: {{ steps | tojson | safe }}
-        };
-    </script>
-</body>
-</html>
+{% block extra_config %}
+steps: {{ steps | tojson | safe }}
+{% endblock %}

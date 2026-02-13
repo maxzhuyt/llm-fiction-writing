@@ -106,6 +106,34 @@ body {
     margin-bottom: 1.5rem;
 }
 
+/* Sidebar navigation links */
+.sidebar-nav-btn {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    transition: background 0.2s;
+    margin-bottom: 4px;
+}
+
+.sidebar-nav-btn:hover {
+    background: var(--bg-light);
+}
+
+.sidebar-nav-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    pointer-events: none;
+}
+
 .sidebar input[type="password"],
 .sidebar select {
     width: 100%;
@@ -211,6 +239,18 @@ body {
     font-weight: 600;
     margin-bottom: 0.5rem;
     font-size: 14px;
+}
+
+/* Sample button row (above user prompt editors) */
+.sample-button-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.btn-sample {
+    padding: 5px 14px;
+    font-size: 13px;
 }
 
 .editor-container {
@@ -438,7 +478,8 @@ body {
     font-family: inherit;
 }
 
-.copy-btn {
+.copy-btn,
+.idea-copy-btn {
     position: absolute;
     top: 8px;
     right: 8px;
@@ -451,11 +492,13 @@ body {
     transition: opacity 0.2s;
 }
 
-.copy-btn:hover {
+.copy-btn:hover,
+.idea-copy-btn:hover {
     opacity: 1;
 }
 
-.copy-btn.copied {
+.copy-btn.copied,
+.idea-copy-btn.copied {
     background: var(--success-bg);
     border-color: var(--success-color);
 }

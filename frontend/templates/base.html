@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Story Engine{% endblock %}</title>
+
+    <!-- CodeMirror 5 CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <!-- Password Gate Modal -->
+    {% if has_password %}
+    <div id="password-modal" class="modal">
+        <div class="modal-content">
+            <h2>Protected App</h2>
+            <input type="password" id="password-input" placeholder="Enter password">
+            <div class="modal-buttons">
+                <button id="login-btn" class="btn btn-primary">Login</button>
+            </div>
+            <p id="password-error" class="error-text" style="display: none;">Wrong password</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h2>Configuration</h2>
+
+            <!-- Navigation -->
+            <div class="sidebar-section">
+                {% block nav_links %}{% endblock %}
+            </div>
+
+            <!-- API Key Section -->
+            <div class="sidebar-section">
+                <h3>API Key</h3>
+                {% if has_env_api_key %}
+                <div class="env-key-notice">
+                    <span class="success-badge">API Key configured from environment</span>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="override-api-key">
+                        Override API key
+                    </label>
+                </div>
+                <div id="api-key-override" style="display: none;">
+                    <input type="password" id="api-key" placeholder="Enter a different API key">
+                </div>
+                {% else %}
+                <input type="password" id="api-key" placeholder="Enter your OpenRouter API key">
+                {% endif %}
+            </div>
+
+            <!-- Model Selection -->
+            <div class="sidebar-section">
+                <h3>Model</h3>
+                <select id="model-select">
+                    {% for name, id in models.items() %}
+                    <option value="{{ id }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Variables Help -->
+            <div class="sidebar-section">
+                {% block variables_help %}
+                <details class="help-section">
+                    <summary>How to use variables</summary>
+                    <p>Reference previous outputs in your prompts.</p>
+                </details>
+                {% endblock %}
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <span id="loading-text">Generating...</span>
+    </div>
+
+    <!-- CodeMirror 5 JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+
+    <!-- Initialize with server data (before page scripts) -->
+    <script>
+        window.APP_CONFIG = {
+            hasEnvApiKey: {{ 'true' if has_env_api_key else 'false' }},
+            hasPassword: {{ 'true' if has_password else 'false' }},
+            models: {{ models | tojson | safe }},
+            {% block extra_config %}{% endblock %}
+        };
+    </script>
+
+    <!-- App scripts -->
+    <script src="/static/js/editor.js"></script>
+    {% block page_scripts %}{% endblock %}
+</body>
+</html>

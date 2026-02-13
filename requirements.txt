@@ -6,6 +6,13 @@ python-dotenv>=1.0.0
 openai>=1.0.0
 aiofiles>=23.2.1
 
+# Vocabulary and word sampling
+tiktoken>=0.5.0
+nltk>=3.8.0
+
+# S3 session recording
+boto3>=1.28.0
+
 # Legacy Streamlit (can be removed after migration is complete)
 # streamlit>=1.28.0
 # st-copy-to-clipboard>=0.1.0

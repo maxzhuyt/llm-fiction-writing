@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Idea Generator - Story Engine{% endblock %}
+
+{% block nav_links %}
+<a href="/" class="sidebar-nav-btn">Story Engine</a>
+<a href="/ideas" class="sidebar-nav-btn active">Idea Generator</a>
+{% endblock %}
+
+{% block variables_help %}
+<details class="help-section">
+    <summary>How to use variables</summary>
+    <p>Reference previous outputs in your prompts:</p>
+    <p><code>priming_output</code> — output from the priming step</p>
+    <p><code>idea_output</code> — output from idea generation</p>
+    <p><code>postprocess_output</code> — output from post-processing</p>
+</details>
+{% endblock %}
+
+{% block content %}
+<h1>Idea Generator</h1>
+
+<div id="api-key-warning" class="warning" style="display: none;">
+    Enter an OpenRouter API key in the sidebar to enable generation.
+</div>
+
+<!-- Step 0: Priming -->
+<section class="step-section" data-step="0">
+    <h2>Step 0: Priming</h2>
+
+    <!-- System Prompt -->
+    <div class="prompt-section">
+        <label>System Prompt</label>
+        <div class="editor-container">
+            <div class="editor-wrapper">
+                <textarea id="idea-step0-system" class="code-editor">{{ idea_steps[0].default_system }}</textarea>
+            </div>
+            <div class="editor-buttons">
+                <button class="btn btn-small edit-toggle-btn" data-editor="idea-step0-system" data-editing="true">Done</button>
+                <button class="btn btn-small editor-copy-btn" data-editor="idea-step0-system" title="Copy to clipboard">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Prompt with Sample Genres button -->
+    <div class="prompt-section">
+        <label>User Prompt <span class="hint">(click "Sample Genres" to auto-fill, or write your own priming prompt)</span></label>
+        <div class="sample-button-row">
+            <button id="sample-genres-btn" class="btn btn-secondary btn-sample">Sample Genres</button>
+        </div>
+        <div class="editor-container">
+            <div class="editor-wrapper">
+                <textarea id="idea-step0-user" class="code-editor"></textarea>
+            </div>
+            <div class="editor-buttons">
+                <button class="btn btn-small edit-toggle-btn" data-editor="idea-step0-user" data-editing="true">Done</button>
+                <button class="btn btn-small editor-copy-btn" data-editor="idea-step0-user" title="Copy to clipboard">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div id="idea-step0-variables" class="variables-status"></div>
+    </div>
+
+    <!-- Generate Button -->
+    <div class="button-row">
+        <button class="btn btn-primary idea-generate-btn" data-step="0">
+            Generate Priming
+        </button>
+    </div>
+
+    <!-- Output -->
+    <div class="output-section" id="idea-step0-output-section" style="display: none;">
+        <label>Output</label>
+        <div class="output-wrapper">
+            <div id="idea-step0-output" class="output-display"></div>
+            <button class="idea-copy-btn" data-step="0" title="Copy to clipboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <hr class="step-divider">
+</section>
+
+<!-- Step 1: Idea Generation -->
+<section class="step-section" data-step="1">
+    <h2>Step 1: Idea Generation</h2>
+
+    <!-- System Prompt -->
+    <div class="prompt-section">
+        <label>System Prompt</label>
+        <div class="editor-container">
+            <div class="editor-wrapper">
+                <textarea id="idea-step1-system" class="code-editor">{{ idea_steps[1].default_system }}</textarea>
+            </div>
+            <div class="editor-buttons">
+                <button class="btn btn-small edit-toggle-btn" data-editor="idea-step1-system" data-editing="true">Done</button>
+                <button class="btn btn-small editor-copy-btn" data-editor="idea-step1-system" title="Copy to clipboard">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Prompt with Sample Words button -->
+    <div class="prompt-section">
+        <label>User Prompt <span class="hint">(click "Sample Words" to auto-fill, or write your own idea prompt)</span></label>
+        <div class="sample-button-row">
+            <button id="sample-words-btn" class="btn btn-secondary btn-sample">Sample Words</button>
+        </div>
+        <div class="editor-container">
+            <div class="editor-wrapper">
+                <textarea id="idea-step1-user" class="code-editor"></textarea>
+            </div>
+            <div class="editor-buttons">
+                <button class="btn btn-small edit-toggle-btn" data-editor="idea-step1-user" data-editing="true">Done</button>
+                <button class="btn btn-small editor-copy-btn" data-editor="idea-step1-user" title="Copy to clipboard">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div id="idea-step1-variables" class="variables-status"></div>
+    </div>
+
+    <!-- Include Priming Checkbox -->
+    <label class="checkbox-label">
+        <input type="checkbox" id="include-priming" checked>
+        Include priming context <span class="hint">(from Step 0 output)</span>
+    </label>
+
+    <!-- Generate Button -->
+    <div class="button-row">
+        <button class="btn btn-primary idea-generate-btn" data-step="1">
+            Generate Idea
+        </button>
+    </div>
+
+    <!-- Output -->
+    <div class="output-section" id="idea-step1-output-section" style="display: none;">
+        <label>Output</label>
+        <div class="output-wrapper">
+            <div id="idea-step1-output" class="output-display"></div>
+            <button class="idea-copy-btn" data-step="1" title="Copy to clipboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <hr class="step-divider">
+</section>
+
+<!-- Step 2: Post-Processing -->
+<section class="step-section" data-step="2">
+    <h2>Step 2: Post-Processing</h2>
+
+    <!-- System Prompt -->
+    <div class="prompt-section">
+        <label>System Prompt</label>
+        <div class="editor-container">
+            <div class="editor-wrapper">
+                <textarea id="idea-step2-system" class="code-editor">{{ idea_steps[2].default_system }}</textarea>
+            </div>
+            <div class="editor-buttons">
+                <button class="btn btn-small edit-toggle-btn" data-editor="idea-step2-system" data-editing="true">Done</button>
+                <button class="btn btn-small editor-copy-btn" data-editor="idea-step2-system" title="Copy to clipboard">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Prompt -->
+    <div class="prompt-section">
+        <label>User Prompt <span class="hint">(use priming_output, idea_output, postprocess_output to reference previous outputs)</span></label>
+        <div class="editor-container">
+            <div class="editor-wrapper">
+                <textarea id="idea-step2-user" class="code-editor"></textarea>
+            </div>
+            <div class="editor-buttons">
+                <button class="btn btn-small edit-toggle-btn" data-editor="idea-step2-user" data-editing="true">Done</button>
+                <button class="btn btn-small editor-copy-btn" data-editor="idea-step2-user" title="Copy to clipboard">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div id="idea-step2-variables" class="variables-status"></div>
+    </div>
+
+    <!-- Generate Button -->
+    <div class="button-row">
+        <button class="btn btn-primary idea-generate-btn" data-step="2">
+            Post-Process
+        </button>
+    </div>
+
+    <!-- Output -->
+    <div class="output-section" id="idea-step2-output-section" style="display: none;">
+        <label>Output</label>
+        <div class="output-wrapper">
+            <div id="idea-step2-output" class="output-display"></div>
+            <button class="idea-copy-btn" data-step="2" title="Copy to clipboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/ideas.js"></script>
+{% endblock %}
+
+{% block extra_config %}
+ideaSteps: {{ idea_steps | tojson | safe }}
+{% endblock %}
