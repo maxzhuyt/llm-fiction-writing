@@ -95,7 +95,7 @@ async def record_session(page, action, step_info, model_id, outputs, step_num=No
         return
 
     try:
-        now = datetime.utcnow()
+        now = datetime.now()
         record = {
             "timestamp": now.isoformat() + "Z",
             "page": page,
