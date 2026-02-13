@@ -266,6 +266,18 @@ body {
     overflow: hidden;
 }
 
+/* Raw textarea fallback (before CodeMirror replaces it) */
+.editor-wrapper textarea.code-editor {
+    width: 100%;
+    min-height: 100px;
+    padding: 8px;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
 .editor-wrapper .CodeMirror {
     height: 100px;
     font-family: var(--font-mono);
