@@ -5,6 +5,7 @@ Main application with routes for LLM generation, export, and session management.
 
 import random
 import logging
+import asyncio
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -133,6 +134,70 @@ async def ideas_page(request: Request):
             "has_password": bool(APP_PASSWORD),
         }
     )
+
+
+@app.get("/sessions")
+async def sessions_page(request: Request):
+    """Serve the session viewer page."""
+    return templates.TemplateResponse(
+        "sessions.html",
+        {
+            "request": request,
+            "models": AVAILABLE_MODELS,
+            "has_env_api_key": bool(OPENROUTER_API_KEY),
+            "has_password": bool(APP_PASSWORD),
+            "s3_configured": s3_service.is_configured(),
+        }
+    )
+
+
+# ─── Session Viewer API Routes ───
+
+@app.get("/api/sessions/tree")
+async def sessions_tree_root():
+    """Return top-level page folders (e.g. story, ideas)."""
+    if not s3_service.is_configured():
+        raise HTTPException(status_code=503, detail="S3 is not configured")
+    loop = asyncio.get_event_loop()
+    prefixes = await loop.run_in_executor(None, s3_service.list_prefixes, "sessions/")
+    folders = [p.replace("sessions/", "").strip("/") for p in prefixes if p.strip("/") != "sessions"]
+    return {"folders": folders}
+
+
+@app.get("/api/sessions/tree/{page}")
+async def sessions_tree_page(page: str):
+    """Return date folders for a given page, newest first."""
+    if not s3_service.is_configured():
+        raise HTTPException(status_code=503, detail="S3 is not configured")
+    loop = asyncio.get_event_loop()
+    prefixes = await loop.run_in_executor(None, s3_service.list_prefixes, f"sessions/{page}/")
+    dates = [p.replace(f"sessions/{page}/", "").strip("/") for p in prefixes]
+    dates.sort(reverse=True)
+    return {"dates": dates}
+
+
+@app.get("/api/sessions/tree/{page}/{date}")
+async def sessions_tree_date(page: str, date: str):
+    """Return files in a date folder."""
+    if not s3_service.is_configured():
+        raise HTTPException(status_code=503, detail="S3 is not configured")
+    loop = asyncio.get_event_loop()
+    files = await loop.run_in_executor(None, s3_service.list_files, f"sessions/{page}/{date}/")
+    # Strip prefix to return just filenames
+    for f in files:
+        f["filename"] = f["key"].split("/")[-1]
+    return {"files": files}
+
+
+@app.get("/api/sessions/file/{page}/{date}/{filename}")
+async def sessions_file(page: str, date: str, filename: str):
+    """Return the JSON content of a session file."""
+    if not s3_service.is_configured():
+        raise HTTPException(status_code=503, detail="S3 is not configured")
+    key = f"sessions/{page}/{date}/{filename}"
+    loop = asyncio.get_event_loop()
+    body = await loop.run_in_executor(None, s3_service.get_object, key)
+    return {"key": key, "content": body}
 
 
 # ─── Shared API Routes ───

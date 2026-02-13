@@ -24,21 +24,60 @@ def is_configured():
     return bool(AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_S3_BUCKET)
 
 
-def _upload_to_s3(key, body):
-    """Synchronous S3 upload (runs in executor)."""
+def _get_s3_client():
+    """Create a boto3 S3 client with configured credentials."""
     import boto3
-    s3 = boto3.client(
+    return boto3.client(
         "s3",
         aws_access_key_id=AWS_ACCESS_KEY_ID,
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
         region_name=AWS_REGION,
     )
+
+
+def _upload_to_s3(key, body):
+    """Synchronous S3 upload (runs in executor)."""
+    s3 = _get_s3_client()
     s3.put_object(
         Bucket=AWS_S3_BUCKET,
         Key=key,
         Body=body,
         ContentType="application/json",
     )
+
+
+def list_prefixes(prefix, delimiter="/"):
+    """List subdirectory prefixes under a given S3 prefix (synchronous)."""
+    s3 = _get_s3_client()
+    paginator = s3.get_paginator("list_objects_v2")
+    prefixes = []
+    for page in paginator.paginate(Bucket=AWS_S3_BUCKET, Prefix=prefix, Delimiter=delimiter):
+        for cp in page.get("CommonPrefixes", []):
+            prefixes.append(cp["Prefix"])
+    return prefixes
+
+
+def list_files(prefix):
+    """List files under a given S3 prefix, newest first (synchronous)."""
+    s3 = _get_s3_client()
+    paginator = s3.get_paginator("list_objects_v2")
+    files = []
+    for page in paginator.paginate(Bucket=AWS_S3_BUCKET, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            files.append({
+                "key": obj["Key"],
+                "size": obj["Size"],
+                "last_modified": obj["LastModified"].isoformat(),
+            })
+    files.sort(key=lambda f: f["last_modified"], reverse=True)
+    return files
+
+
+def get_object(key):
+    """Get the body of an S3 object as a string (synchronous)."""
+    s3 = _get_s3_client()
+    resp = s3.get_object(Bucket=AWS_S3_BUCKET, Key=key)
+    return resp["Body"].read().decode("utf-8")
 
 
 async def record_session(page, action, step_info, model_id, outputs):

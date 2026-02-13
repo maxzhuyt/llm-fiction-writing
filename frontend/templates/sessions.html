@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Sessions - Story Engine{% endblock %}
+
+{% block nav_links %}
+<a href="/" class="sidebar-nav-btn">Story Engine</a>
+<a href="/ideas" class="sidebar-nav-btn">Idea Generator</a>
+<a href="/sessions" class="sidebar-nav-btn active">Sessions</a>
+{% endblock %}
+
+{% block variables_help %}{% endblock %}
+
+{% block content %}
+<h1>Sessions</h1>
+
+{% if not s3_configured %}
+<div class="warning">
+    S3 is not configured. Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_S3_BUCKET environment variables to browse session recordings.
+</div>
+{% else %}
+<div id="session-tree" class="session-tree"></div>
+
+<div id="session-detail" class="session-detail" style="display: none;">
+    <div class="session-detail-header">
+        <span id="session-detail-path" class="session-detail-path"></span>
+        <button id="session-detail-close" class="btn btn-secondary btn-small">Close</button>
+    </div>
+    <pre id="session-detail-content" class="session-detail-content"></pre>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/sessions.js"></script>
+{% endblock %}
+
+{% block extra_config %}
+s3Configured: {{ 'true' if s3_configured else 'false' }}
+{% endblock %}
