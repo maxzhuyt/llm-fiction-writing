@@ -110,9 +110,9 @@ class PasswordCheckRequest(BaseModel):
 async def index(request: Request):
     """Serve the main story page."""
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
-            "request": request,
             "models": AVAILABLE_MODELS,
             "steps": STEPS,
             "has_env_api_key": bool(OPENROUTER_API_KEY),
@@ -125,9 +125,9 @@ async def index(request: Request):
 async def ideas_page(request: Request):
     """Serve the idea generator page."""
     return templates.TemplateResponse(
+        request,
         "ideas.html",
         {
-            "request": request,
             "models": AVAILABLE_MODELS,
             "idea_steps": IDEA_STEPS,
             "has_env_api_key": bool(OPENROUTER_API_KEY),
@@ -140,9 +140,9 @@ async def ideas_page(request: Request):
 async def sessions_page(request: Request):
     """Serve the session viewer page."""
     return templates.TemplateResponse(
+        request,
         "sessions.html",
         {
-            "request": request,
             "models": AVAILABLE_MODELS,
             "has_env_api_key": bool(OPENROUTER_API_KEY),
             "has_password": False,
